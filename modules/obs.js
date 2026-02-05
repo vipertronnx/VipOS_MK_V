@@ -1,34 +1,31 @@
-// Connect to OBS
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const obs = new OBSWebSocket();
 
-// Declare some events to listen for.
-obs.on('ConnectionOpened', () => {
-  console.log('Connection Opened');
-});
+const obsInit = async function() {
 
-obs.on('Identified', () => {
-	console.log('Identified, good to go!')
+  // Declare some events to listen for.
+  obs.on('ConnectionOpened', () => {
+    console.log('Connection Opened');
+  });
 
-  // Send some requests.
-  // obs.call('GetSceneList').then((data) => {
-  //   console.log('Scenes:', data);
-  // });
-});
+  obs.on('Identified', () => {
+    console.log('Identified, good to go!')
+    // Send some requests.
+    // obs.call('GetSceneList').then((data) => {
+    //   console.log('Scenes:', data);
+    // });
+  });
 
-obs.on('CurrentProgramSceneChanged', data => {
-  console.log(`Scene Changed to: ${data.sceneName}`);
-});
+  obs.connect(process.env.OBS_ADDRESS, process.env.OBS_PASSWORD).then((info) => {
+    console.log('Connected and identified', info)
+  }, () => {
+    console.error('Error Connecting')
+  });
 
-// obs.once('ExitStarted', () => {
-//   console.log('OBS started shutdown');
+}
 
-//   // Just for example, not necessary should you want to reuse this instance by re-connect()
-//   obs.off('CurrentSceneChanged', onCurrentSceneChanged);
-// });
+obsInit();
 
-obs.connect(process.env.OBS_ADDRESS, process.env.OBS_PASSWORD).then((info) => {
-	console.log('Connected and identified', info)
-}, () => {
-	console.error('Error Connecting')
-});
+module.exports = {
+  obs: obs
+}

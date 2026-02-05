@@ -13,7 +13,7 @@ const favicon = require('serve-favicon')
 const path = require('path')
 
 // OBS init
-const obs = require('./modules/obs');
+const { obs } = require('./modules/obs');
 
 // Chat Client inits
 const chat = require('./modules/chat')(io);
