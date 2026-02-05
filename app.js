@@ -1,13 +1,13 @@
+// Load environment variables
+require('dotenv').config()
+
 // Express App + Socket.IO inits
 const express = require('express')
 const app = express();
-require('dotenv').config()
-
 const http = require('http')
 const server = http.createServer(app)
 const { Server } = require("socket.io")
 const io = new Server(server)
-
 const cors = require('cors')
 const favicon = require('serve-favicon')
 const path = require('path')
@@ -15,7 +15,7 @@ const path = require('path')
 // OBS init
 const { obs } = require('./modules/obs');
 
-// Chat Client inits
+// Chat Client init
 const chat = require('./modules/chat')(io);
 
 /**
