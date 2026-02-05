@@ -1,12 +1,12 @@
-/* I M P O R T S
+/* R E S E T
 -------------------------------------------------------------------------------*/
-@use 'reset';
+@use 'imports/reset';
 
-/* FONTS
+/* F O N T S
 -------------------------------------------------------------------------------*/
-@use 'fonts';
+@use 'imports/fonts';
 
-/* S T Y L E S
+/* M A I N - S T Y L E S
 -------------------------------------------------------------------------------*/
 body {
   background-color: #ededed;
@@ -19,8 +19,6 @@ body {
 a {color: var(--featured-color);}
 a:hover {color: var(--featured-color-hover);}
 
-
-
-/* MEDIA QUERIES
+/* M E D I A - Q U E R I E S
 -------------------------------------------------------------------------------*/
 @media screen and (max-width: 1000px) { }
