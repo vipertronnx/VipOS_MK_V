@@ -1,7 +1,7 @@
 {
   "name": "vipos_mk5",
   "version": "1.0.0",
-  "description": "VipOS Mark 5 Stream Platform",
+  "description": "VipOS MK V | Chat Bot + Overlay Platform ",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
