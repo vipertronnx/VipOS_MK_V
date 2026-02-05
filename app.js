@@ -11,6 +11,9 @@ const cors = require('cors')
 const favicon = require('serve-favicon')
 const path = require('path')
 
+// OBS init
+const obs = require('./modules/obs');
+
 // Chat Client inits
 const chat = require('./modules/chat')(io);
 
@@ -74,6 +77,6 @@ app.all('*', (req, res) => {
  * Listen on port
  *
  */
-server.listen(5000, async () => {
+server.listen(6000, async () => {
   console.log('server is listening on port 5000....')
 })
