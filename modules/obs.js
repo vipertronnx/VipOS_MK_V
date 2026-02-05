@@ -11,12 +11,14 @@ obs.on('Identified', () => {
 	console.log('Identified, good to go!')
 
   // Send some requests.
-  obs.call('GetSceneList').then((data) => {
-    // console.log('Scenes:', data);
-  });
+  // obs.call('GetSceneList').then((data) => {
+  //   console.log('Scenes:', data);
+  // });
 });
 
-obs.on('CurrentProgramSceneChanged', onCurrentSceneChanged);
+obs.on('CurrentProgramSceneChanged', data => {
+  console.log(`Scene Changed to: ${data.sceneName}`);
+});
 
 // obs.once('ExitStarted', () => {
 //   console.log('OBS started shutdown');
@@ -25,16 +27,8 @@ obs.on('CurrentProgramSceneChanged', onCurrentSceneChanged);
 //   obs.off('CurrentSceneChanged', onCurrentSceneChanged);
 // });
 
-obs.on('SwitchScenes', data => {
-  console.log('SwitchScenes', data);
-});
-
 obs.connect(process.env.OBS_ADDRESS, process.env.OBS_PASSWORD).then((info) => {
 	console.log('Connected and identified', info)
 }, () => {
 	console.error('Error Connecting')
 });
-
-function onCurrentSceneChanged(event) {
-  console.log('Current scene changed to', event.sceneName)
-}
