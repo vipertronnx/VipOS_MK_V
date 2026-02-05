@@ -16,6 +16,11 @@ const obsInit = async function() {
     // });
   });
 
+  // Example of listening to a specific event.
+  obs.on('CurrentProgramSceneChanged', data => {
+    console.log(`Scene Changed to: ${data.sceneName}`);
+  });
+
   obs.connect(process.env.OBS_ADDRESS, process.env.OBS_PASSWORD).then((info) => {
     console.log('Connected and identified', info)
   }, () => {
