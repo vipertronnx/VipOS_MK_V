@@ -8,8 +8,13 @@
 
 /* M A I N - S T Y L E S
 -------------------------------------------------------------------------------*/
+html,
 body {
-  background-color: #ededed;
+  height: 1080px;
+  width: 1920px;
+}
+
+body {
   font-size: 16px;
   font-family:
   var(--font-system);
@@ -19,6 +24,26 @@ body {
 a {color: var(--featured-color);}
 a:hover {color: var(--featured-color-hover);}
 
+.page {
+  h1, h2 {
+    font-weight: bolder;
+    text-align: center;
+  }
+  h1 { font-size: 50px; }
+  h2 {
+    font-size: 30px;
+    font-style: italic;
+    letter-spacing: -0.5px;
+    text-transform: uppercase;
+  }
+}
+
+#overlays-container {
+  background: red;
+  height: 1080px;
+  width: 1920px;
+}
+
 /* M E D I A - Q U E R I E S
 -------------------------------------------------------------------------------*/
-@media screen and (max-width: 1000px) { }
+// @media screen and (max-width: 1000px) { }

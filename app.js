@@ -38,9 +38,9 @@ app.get('/', (req, res) => {
  * Overlays
  *
  */
-// app.get('/', (req, res) => {
-//   res.render('.ejs')
-// })
+app.get('/overlay/venom-coin',(req, res) => {
+  res.render('overlays/venom-coin.ejs')
+})
 
 
 
