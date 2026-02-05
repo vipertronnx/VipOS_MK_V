@@ -4,7 +4,8 @@
   "description": "VipOS Mark 5 Stream Platform",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js"
   },
   "author": "v i p e r <hello@viperverse.tv> (https://viperverse.tv/)",
   "license": "MIT",
@@ -14,14 +15,17 @@
     "@twurple/chat": "^6.2.1",
     "@twurple/eventsub-ws": "^6.2.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "ejs": "^3.1.9",
     "express": "^4.18.2",
     "fs": "^0.0.1-security",
     "http": "^0.0.1-security",
-    "nodemon": "^3.1.11",
     "obs-websocket-js": "^5.0.7",
     "serve-favicon": "^2.0.1",
     "socket.io": "^4.7.0",
     "tmi.js": "^1.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
   }
 }

@@ -1,5 +1,4 @@
 // Connect to OBS
-const { opts } = require('../config/obs-settings')
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const obs = new OBSWebSocket();
 
@@ -30,7 +29,7 @@ obs.on('SwitchScenes', data => {
   console.log('SwitchScenes', data);
 });
 
-obs.connect('ws://localhost:4455', opts.password).then((info) => {
+obs.connect(process.env.OBS_ADDRESS, process.env.OBS_PASSWORD).then((info) => {
 	console.log('Connected and identified', info)
 }, () => {
 	console.error('Error Connecting')

@@ -1,6 +1,7 @@
 // Express App + Socket.IO inits
 const express = require('express')
 const app = express();
+const dotenv = require('dotenv').config()
 
 const http = require('http')
 const server = http.createServer(app)
@@ -77,6 +78,6 @@ app.all('*', (req, res) => {
  * Listen on port
  *
  */
-server.listen(6000, async () => {
-  console.log('server is listening on port 5000....')
+server.listen(process.env.PORT, async () => {
+  console.log(`server is listening on port ${process.env.PORT}....`)
 })
