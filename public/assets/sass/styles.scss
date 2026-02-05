@@ -1,0 +1,26 @@
+/* I M P O R T S
+-------------------------------------------------------------------------------*/
+@use 'reset';
+
+/* FONTS
+-------------------------------------------------------------------------------*/
+@use 'fonts';
+
+/* S T Y L E S
+-------------------------------------------------------------------------------*/
+body {
+  background-color: #ededed;
+  font-size: 16px;
+  font-family:
+  var(--font-system);
+  color: var(--text-color);
+}
+
+a {color: var(--featured-color);}
+a:hover {color: var(--featured-color-hover);}
+
+
+
+/* MEDIA QUERIES
+-------------------------------------------------------------------------------*/
+@media screen and (max-width: 1000px) { }
