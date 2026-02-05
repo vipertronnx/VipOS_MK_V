@@ -66,7 +66,7 @@ app.get('/', (req, res) => {
  *
  */
 app.all('*', (req, res) => {
-  res.status(404).send('resource not found')
+  res.status(404).render('404.ejs')
 })
 
 
