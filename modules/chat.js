@@ -1,25 +1,12 @@
-/*
- * Get socket IO
- *
- */
-var io;
-module.exports = function(importIO) {
-    io = importIO;
+let io;
+
+// Chat Client init
+const chatInit = async function() {
+  console.log('chat service initialized')
 }
 
-/**
- *  Connect to Chat
- *
- */
-const chat = async function() {
+chatInit();
 
-    // Chat Client init
-    console.log('chat service initialized')
-  }
-
-
-/**
- * Initialize the chat bot
- *
- */
-chat();
+module.exports = function(importIO) {
+  io = importIO;
+}
