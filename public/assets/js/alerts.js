@@ -2,36 +2,37 @@ var textAlertTimeout;
 
 socket.on('text-alert', function (message) {
   var text = message.message;
+  var header = document.querySelector('#text-alert-header-content h1');
 
-  document.querySelector('h1').innerHTML = text.replace(/'/gi,"").replace(/ /gi,"&nbsp;&nbsp;");
+  header.innerHTML = text.replace(/'/gi,"").replace(/ /gi,"&nbsp;&nbsp;");
 
-  // if(!document.querySelector('h1').classList.contains('fade')) {
+  if(!header.classList.contains('fade')) {
 
-  //   document.querySelector('.left').classList.toggle('slide');
-  //   document.querySelector('.right').classList.toggle('slide');
+    document.querySelector('.left').classList.toggle('slide');
+    document.querySelector('.right').classList.toggle('slide');
 
-  //   setTimeout(() => {
-  //     document.querySelector('h1').innerHTML = text.replace(/'/gi,"").replace(/ /gi,"&nbsp;&nbsp;");
+    setTimeout(() => {
+      header.innerHTML = text.replace(/'/gi,"");
 
-  //     document.querySelector('h1').classList.toggle('fade');
-  //     textAlertTimeout = setTimeout(() => {
-  //       document.querySelector('h1').classList.toggle('fade');
-  //       document.querySelector('.left').classList.toggle('slide');
-  //       document.querySelector('.right').classList.toggle('slide');
-  //     }, "3000");
+      header.classList.toggle('fade');
+      textAlertTimeout = setTimeout(() => {
+        header.classList.toggle('fade');
+        document.querySelector('.left').classList.toggle('slide');
+        document.querySelector('.right').classList.toggle('slide');
+      }, "3000");
 
-  //   }, "200");
+    }, "200");
 
 
-  // } else {
-  //   clearTimeout( textAlertTimeout );
+  } else {
+    clearTimeout( textAlertTimeout );
 
-  //   document.querySelector('h1').innerHTML = text.replace(/'/gi,"").replace(/ /gi,"&nbsp;&nbsp;");
+    header.innerHTML = text.replace(/'/gi,"").replace(/ /gi,"&nbsp;&nbsp;");
 
-  //   textAlertTimeout = setTimeout(() => {
-  //     document.querySelector('h1').classList.toggle('fade');
-  //     document.querySelector('.left').classList.toggle('slide');
-  //     document.querySelector('.right').classList.toggle('slide');
-  //   }, "3000");
-  // }
+    textAlertTimeout = setTimeout(() => {
+      header.classList.toggle('fade');
+      document.querySelector('.left').classList.toggle('slide');
+      document.querySelector('.right').classList.toggle('slide');
+    }, "3000");
+  }
 });
