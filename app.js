@@ -50,6 +50,11 @@ app.get('/overlay/tv-guide',(req, res) => {
   res.render('overlays/tv-guide.ejs')
 })
 
+// Example overlay with socket.io client included
+// app.get('/overlay/example-with-socket',(req, res) => {
+//   res.render('overlays/example-with-socket.ejs', { loadSocket: true })
+// })
+
 
 
 /**

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="<%= process.env.APP_NAME %> | <%= process.env.APP_DESCRIPTION %>" />
 <meta name="author" content="v i p e r" />
-<link rel="stylesheet" href="/assets/css/styles.css" />
-<script src="/socket.io/socket.io.js"></script>
+<link rel="stylesheet" href="/assets/css/styles.css" /><% if( typeof(loadSocket) != "undefined") { %>
+<script src="/socket.io/socket.io.js"></script><% } %>
 </head>
 <body>
