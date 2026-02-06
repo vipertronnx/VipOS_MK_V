@@ -11,6 +11,7 @@
 html,
 body {
   height: 1080px;
+  overflow: hidden;
   width: 1920px;
 }
 
@@ -38,10 +39,100 @@ a:hover {color: var(--featured-color-hover);}
   }
 }
 
-#overlays-container {
-  background: red;
+/* T V - G U I D E
+-------------------------------------------------------------------------------*/
+#viper-tv_guide {
+
   height: 1080px;
   width: 1920px;
+  background: #efefef;
+  position: absolute;
+  overflow: hidden;
+
+  #green-screen {
+    background: url('../img/purple_bg_2.jpg');
+    background-position-y: 50%;
+    background-size: cover;
+    height: 50%;
+    position: absolute;
+    width: 100%;
+    z-index: 10;
+  }
+
+  table {
+    position: relative;
+    top: 50%;
+    width: 100%;
+
+    th,
+    td {
+      border-top: 5px solid #787887;
+      border-left: 5px solid #b3b7d6;
+      border-right: 5px solid #000252;
+      border-bottom: 5px solid #07083b;
+      font-size: 45px;
+      font-weight: bold;
+      font-family: 'Arial', 'Calibri', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      letter-spacing: -3px;
+      line-height: 50px;
+      padding: 7px 10px 5px;
+      text-shadow: 3px 3px black;
+    }
+
+    thead {
+      position: relative;
+      z-index: 1;
+
+      th {
+        background-color: #112385;
+        color: #e2d560;
+        text-align: center;
+        width: 21.25%;
+      }
+      th#current-time {
+        color: #fff;
+        width: 15%;
+      }
+    }
+
+    tbody {
+      animation: tvguide 60s linear infinite;
+      position: relative;
+
+      tr { width: 100%; }
+
+      td {
+        background-color: #0f2555;
+        color: #fff;
+
+        &.channel-title {
+          color: #e2d560;
+          text-align: center;
+        }
+      }
+
+      tr.viperverse {
+        td {
+          background-color: #05122c;
+          font-family: 'NeoNoire', Arial;
+          font-size: 100px;
+          letter-spacing: 0px;
+          padding: 100px 10px;
+          text-align: center;
+          text-shadow: -3px 3px #00fffc, -6px 6px #ff00f0, -9px 9px #000;
+        }
+      }
+    }
+  }
+}
+
+@keyframes tvguide {
+	0% {
+    top: 0;
+	}
+  100% {
+    top: -3188px; //( + 122px for each new row added )
+  }
 }
 
 /* M E D I A - Q U E R I E S

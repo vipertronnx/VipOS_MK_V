@@ -46,6 +46,10 @@ app.get('/overlay/venom-coin',(req, res) => {
   res.render('overlays/venom-coin.ejs')
 })
 
+app.get('/overlay/tv-guide',(req, res) => {
+  res.render('overlays/tv-guide.ejs')
+})
+
 
 
 /**
