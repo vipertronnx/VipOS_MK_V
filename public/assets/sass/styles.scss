@@ -52,8 +52,8 @@ a:hover {color: var(--featured-color-hover);}
     text-shadow: #333 -2px 2px;
   }
   h3 {
-    letter-spacing: 1px;
     font-size: 15px;
+    letter-spacing: 1px;
     padding: 0 0 15px;
   }
 
@@ -76,12 +76,11 @@ a:hover {color: var(--featured-color-hover);}
 /* T V - G U I D E
 -------------------------------------------------------------------------------*/
 #viper-tv_guide {
-
-  height: 1080px;
-  width: 1920px;
   background: #efefef;
-  position: absolute;
+  height: 1080px;
   overflow: hidden;
+  position: absolute;
+  width: 1920px;
 
   #green-screen {
     background: url('../img/purple_bg_2.jpg');
