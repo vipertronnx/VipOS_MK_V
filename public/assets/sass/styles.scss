@@ -26,16 +26,50 @@ a {color: var(--featured-color);}
 a:hover {color: var(--featured-color-hover);}
 
 .page {
-  h1, h2 {
-    font-weight: bolder;
-    text-align: center;
+  background: #7a3291 url("../img/noise-transparent.png") repeat 0 0;
+  color:#fff;
+  height: 100%;
+  text-align: center;
+  .page-header {
+    background: url('../img/sun_bg.png') no-repeat center;
+    background-size: 300px 300px;
+    padding: 100px 0 75px;
   }
-  h1 { font-size: 50px; }
+  h1, h2, h3 {
+    font-weight: bolder;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-family: 'NeoNoire', Arial;
+    font-size: 100px;
+    padding: 0 0 20px;
+    text-shadow: #00fffc -3px 3px, #ff00f0 -6px 6px;
+  }
   h2 {
     font-size: 30px;
     font-style: italic;
     letter-spacing: -0.5px;
-    text-transform: uppercase;
+    text-shadow: #333 -2px 2px;
+  }
+  h3 {
+    letter-spacing: 1px;
+    font-size: 15px;
+    padding: 0 0 15px;
+  }
+
+  ul {
+    li {
+      a {
+        color:#00fffc;
+        display: inline-block;
+        font-weight: bold;
+        padding: 15px 0;
+        &:hover {
+          color: #fff;
+          text-decoration: none;
+        }
+      }
+    }
   }
 }
 

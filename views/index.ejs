@@ -1,8 +1,15 @@
 <%- include("templates/header") %>
 
 <div class="page">
-  <h1><%= process.env.APP_NAME %></h1>
-  <h2><%= process.env.APP_DESCRIPTION %></h2>
+  <div class="page-header">
+    <h1><%= process.env.APP_NAME %></h1>
+    <h2><%= process.env.APP_DESCRIPTION %></h2>
+  </div>
+  <h3>Available Overlays:</h3>
+  <ul>
+    <li><a target="_blank" href="/overlay/venom-coin">Venom Coin</a></li>
+    <li><a target="_blank" href="/overlay/tv-guide">TV Guide</a></li>
+  </ul>
 </div>
 
 <%- include("templates/footer") %>
