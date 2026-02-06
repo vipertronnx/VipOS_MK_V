@@ -75,7 +75,7 @@ a:hover {color: var(--featured-color-hover);}
 
 /* T V - G U I D E
 -------------------------------------------------------------------------------*/
-#viper-tv_guide {
+#tv-guide {
   background: #efefef;
   height: 1080px;
   overflow: hidden;
@@ -166,6 +166,65 @@ a:hover {color: var(--featured-color-hover);}
   100% {
     top: -3188px; //( + 122px for each new row added )
   }
+}
+
+/* T E X T - A L E R T S
+-------------------------------------------------------------------------------*/
+#text-alert {
+  align-items: center;
+  display: flex;
+  height: 1080px;
+  justify-content: center;
+  padding: 0;
+  width: 1920px;
+
+  div.background {
+    position: absolute;;
+    height:1080px;
+    width: 960px;
+    z-index: -10;
+    transition: all 0.2s;
+
+    &.left {
+      background: url('../img/text_alert_bg_left_v3.jpg');
+      left: -960px;
+      top: 0;
+      &.slide {
+        left: 0px;
+      }
+    }
+
+    &.right {
+      background: url('../img/text_alert_bg_right_v3.jpg');
+      left: 1920px;
+      top: 0;
+      &.slide {
+        left: 960px;
+      }
+    }
+  }
+
+  h1 {
+    color: #f0f0f0;
+    display: block;
+    font-family: 'NeoNoire', Arial;
+    font-size: 40px;
+    line-height: 60px;
+    text-align: center;
+    text-shadow: -3px 3px #00fffc, -6px 6px #ff00f0, -9px 9px #000;
+    padding: 20px;
+    //opacity: 0;
+    transform: scale(0.5) rotate(0deg) translateY(-10%);
+    transition: all 1s;
+    //word-wrap: break-word;
+
+
+    &.fade {
+      opacity: 1;
+      transform: scale(1) rotate(-5deg) translateY(-50%);
+    }
+  }
+
 }
 
 /* M E D I A - Q U E R I E S

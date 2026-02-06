@@ -50,10 +50,9 @@ app.get('/overlay/tv-guide',(req, res) => {
   res.render('overlays/tv-guide.ejs')
 })
 
-// Example overlay with socket.io client included
-// app.get('/overlay/example-with-socket',(req, res) => {
-//   res.render('overlays/example-with-socket.ejs', { loadSocket: true })
-// })
+app.get('/overlay/alerts',(req, res) => {
+  res.render('overlays/alerts.ejs', { loadSocket: true })
+})
 
 
 
@@ -62,10 +61,10 @@ app.get('/overlay/tv-guide',(req, res) => {
  *
  */
 
-// app.post('/api/v1/text', express.json(), (req, res) => {
-//   io.emit('text-alert', { message: req.body.msg });
-//   res.sendStatus(200);
-// })
+app.post('/api/v1/text', express.json(), (req, res) => {
+  io.emit('text-alert', { message: req.body.msg });
+  res.sendStatus(200);
+})
 
 // app.post('/api/v1/bg-alert', express.json(), (req, res) => {
 //   io.emit('bg-alert');

@@ -8,6 +8,9 @@
 <meta name="description" content="<%= process.env.APP_NAME %> | <%= process.env.APP_DESCRIPTION %>" />
 <meta name="author" content="v i p e r" />
 <link rel="stylesheet" href="/assets/css/styles.css" /><% if( typeof(loadSocket) != "undefined") { %>
-<script src="/socket.io/socket.io.js"></script><% } %>
+<script src="/socket.io/socket.io.js"></script>
+<script type="text/javascript">
+var socket = io('http://localhost:<%= process.env.PORT %>');
+</script><% } %>
 </head>
 <body>
