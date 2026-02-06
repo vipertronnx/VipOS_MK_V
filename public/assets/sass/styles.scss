@@ -181,9 +181,9 @@ a:hover {color: var(--featured-color-hover);}
   div.background {
     position: absolute;;
     height:1080px;
+    transition: all 0.2s;
     width: 960px;
     z-index: -10;
-    transition: all 0.2s;
 
     &.left {
       background: url('../img/text_alert_bg_left_v3.jpg');
@@ -206,10 +206,10 @@ a:hover {color: var(--featured-color-hover);}
 }
 
 #text-alert-header {
+  display: table;
   height: 1080px;
   position: absolute;
   width: 1920px;
-  display: table;
 
   #text-alert-header-content {
     display: table-cell;
