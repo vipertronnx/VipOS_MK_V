@@ -16,7 +16,7 @@ const path = require('path')
 const { obs } = require('./modules/obs');
 
 // Chat Client init
-const chat = require('./modules/chat')(io);
+require('./modules/chat')(io);
 
 /**
  * Setup static directory
