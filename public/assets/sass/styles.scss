@@ -236,6 +236,60 @@ a:hover {color: var(--featured-color-hover);}
   }
 }
 
+/* C O M M A N D S - B A R
+-------------------------------------------------------------------------------*/
+#commands-bar {
+  height: 100px;
+  left: 0;
+  position: absolute;
+  top: 0;
+
+  div.command {
+    display: inline-block;
+    height: 100px;
+    padding: 0 25px;
+    position: relative;
+    top: -100px;
+
+    h1 {
+      color: #fff;
+      font-family: 'NeoNoire', Arial;
+      font-size: 25px; //40px;
+      line-height: 82px;
+      text-shadow: -2px 2px #00fffc, -4px 4px #ff00f0, -6px 6px #000;
+    }
+
+    &.discord { animation: commandbar 30s ease infinite; }
+    &.lurk    { animation: commandbar 30s ease infinite; animation-delay: 0.2s; }
+  }
+}
+
+@keyframes commandbar {
+	0% {
+		top: -100px;
+    left: 0px;
+	}
+	1% {
+		top: 0px;
+    left: 0;
+	}
+  19% {
+    top: 0px;
+    left: 0;
+  }
+  20% {
+    left: -1040px;
+  }
+  99% {
+    top: -100px;
+    left: -1040px;
+  }
+  100% {
+    top: -100px;
+    left: 0px;
+  }
+}
+
 /* M E D I A - Q U E R I E S
 -------------------------------------------------------------------------------*/
 // @media screen and (max-width: 1000px) { }
