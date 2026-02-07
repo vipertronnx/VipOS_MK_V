@@ -73,6 +73,83 @@ a:hover {color: var(--featured-color-hover);}
   }
 }
 
+/* A N I M A T E D - B A C K G R O U N D
+-------------------------------------------------------------------------------*/
+#animated-bg {
+  background: linear-gradient(-90deg, #ff0000, #ffdb78, #ff0000);
+	background-size: 300% 300%;
+	animation: gradient 10s ease infinite;
+  height: 1080px;
+  padding: 7px;
+  width: 1920px;
+
+  #bg-chroma-key {
+    background-color: #00e439;
+    height: 100%;
+    width: 100%;
+  }
+
+  /**
+   * 6 Random Gradient Backgrounds
+   * (Triggered by 'bg-random' event)
+   * No green - the premise is to use this as a background for chroma keying, so green is reserved for that purpose.
+   */
+  &.random1 {
+    background: linear-gradient(-90deg, #ff0000, #ffdb78, #ff0000);
+    background-size: 300% 300%;
+    animation: gradient 10s ease infinite;
+  }
+
+  &.random2 {
+    background: linear-gradient(-90deg, #0084ff, #ff00f0, #0084ff);
+    background-size: 300% 300%;
+    animation: gradient 10s ease infinite;
+  }
+
+  &.random3 {
+    background: linear-gradient(-90deg, #2b336f, #7a3291, #2b336f);
+    background-size: 300% 300%;
+    animation: gradient 10s ease infinite;
+  }
+
+  &.random4 {
+    background: linear-gradient(-90deg, #e75333, #0084ff, #e75333);
+    background-size: 300% 300%;
+    animation: gradient 10s ease infinite;
+  }
+
+  &.random5 {
+    background: linear-gradient(-90deg, #ff00f0, #2b336f, #ff00f0);
+    background-size: 300% 300%;
+    animation: gradient 10s ease infinite;
+  }
+
+  &.random6 {
+    background: linear-gradient(-90deg, #fd5102, #00e1ff, #fd5102);
+    background-size: 300% 300%;
+    animation: gradient 10s ease infinite;
+  }
+
+  &.alert {
+    background: linear-gradient(-90deg, #ff0000, #ffffff, #ff0000, #ffffff, #ff0000);
+    background-size: 200% 200%;
+	  animation: gradient 1.5s ease infinite;
+  }
+
+}
+
+@keyframes gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 200% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
 /* T V - G U I D E
 -------------------------------------------------------------------------------*/
 #tv-guide {

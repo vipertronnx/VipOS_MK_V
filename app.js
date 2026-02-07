@@ -16,7 +16,7 @@ const path = require('path')
 const { obs } = require('./modules/obs');
 
 // Chat Client init
-require('./modules/chat');
+const { chatTest } = require('./modules/chat')(io);
 
 /**
  * Setup static directory
@@ -42,16 +42,20 @@ app.get('/', (req, res) => {
  * Overlays
  *
  */
-app.get('/overlay/venom-coin',(req, res) => {
-  res.render('overlays/venom-coin.ejs')
+app.get('/overlay/alerts',(req, res) => {
+  res.render('overlays/alerts.ejs', { loadSocket: true })
+})
+
+app.get('/overlay/stream-border',(req, res) => {
+  res.render('overlays/stream-border.ejs', { loadSocket: true })
 })
 
 app.get('/overlay/tv-guide',(req, res) => {
   res.render('overlays/tv-guide.ejs')
 })
 
-app.get('/overlay/alerts',(req, res) => {
-  res.render('overlays/alerts.ejs', { loadSocket: true })
+app.get('/overlay/venom-coin',(req, res) => {
+  res.render('overlays/venom-coin.ejs')
 })
 
 
@@ -61,15 +65,27 @@ app.get('/overlay/alerts',(req, res) => {
  *
  */
 
+// TO-DO REFACTOR THESE BOTH
+app.post('/api/v1/bg-alert', express.json(), (req, res) => {
+  io.emit('bg-alert');
+  res.sendStatus(200);
+})
+
+app.post('/api/v1/bg-random', express.json(), (req, res) => {
+  io.emit('bg-random');
+  res.sendStatus(200);
+})
+
 app.post('/api/v1/text', express.json(), (req, res) => {
   io.emit('text-alert', { message: req.body.msg });
   res.sendStatus(200);
 })
 
-// app.post('/api/v1/bg-alert', express.json(), (req, res) => {
-//   io.emit('bg-alert');
-//   res.sendStatus(200);
-// })
+app.post('/api/v1/test', express.json(), (req, res) => {
+  //io.emit('bg-alert');
+  chatTest();
+  res.sendStatus(200);
+})
 
 
 
