@@ -1,5 +1,5 @@
 const SHOW_DELAY = 200;
-const VISIBLE_DURATION = 3000;
+const VISIBLE_DURATION = 4000;
 
 let textAlertTimeout = null;
 const header = document.querySelector('#text-alert-header-content h1');
