@@ -75,19 +75,68 @@ test('delay actions reject non-finite values', async () => {
   )
 })
 
+test('action structure validation accepts every supported action type', () => {
+  const actions = [
+    { type: 'chat.say', message: 'Hello' },
+    { type: 'context.pickRandom', contextKey: 'greeting' },
+    { type: 'delay' },
+    { action: 'log' },
+    { type: 'obs.media', input: 'Video', mediaAction: 'restart' },
+    { type: 'obs.mute', input: 'Music' },
+    { type: 'obs.scene', scene: 'Live' },
+    { type: 'obs.source', source: 'Camera' },
+    { type: 'overlay.alert', message: '{displayName} joined' },
+    { type: 'overlay.emit', event: 'bg-alert' },
+    { type: 'sound.pickRandom' },
+    { type: 'sound.play', src: 'example.mp3' }
+  ]
+
+  for (const action of actions) {
+    assert.doesNotThrow(() => validateActionStructure(action), action.type || action.action)
+  }
+})
+
+test('action structure validation preserves required field alternatives', () => {
+  const actions = [
+    { type: 'chat.say', text: 'Hello' },
+    { type: 'context.pickRandom', key: 'greeting' },
+    { type: 'obs.media', source: 'Video', media: 'restart' },
+    { type: 'obs.mute', source: 'Music' },
+    { type: 'obs.source', input: 'Camera' },
+    { type: 'sound.play', path: 'example.mp3' }
+  ]
+
+  for (const action of actions) {
+    assert.doesNotThrow(() => validateActionStructure(action), action.type)
+  }
+})
+
 test('action structure validation rejects unknown types and missing required fields', () => {
   assert.throws(
     () => validateActionStructure({ type: 'unknown.action' }),
     error => error.statusCode === 400 && /Unknown action type/.test(error.message)
   )
-  assert.throws(
-    () => validateActionStructure({ type: 'overlay.alert' }),
-    error => error.statusCode === 400 && /overlay.alert requires message/.test(error.message)
-  )
-  assert.doesNotThrow(() => validateActionStructure({
-    type: 'overlay.alert',
-    message: '{displayName} joined'
-  }))
+
+  const requiredFields = [
+    ['chat.say', {}, 'chat.say requires message or text'],
+    ['context.pickRandom', {}, 'context.pickRandom requires contextKey or key'],
+    ['obs.media', { input: 'Video' }, 'obs.media requires mediaAction or media or command'],
+    ['obs.media', { mediaAction: 'restart' }, 'obs.media requires input or source'],
+    ['obs.mute', {}, 'obs.mute requires input or source'],
+    ['obs.scene', {}, 'obs.scene requires scene'],
+    ['obs.source', {}, 'obs.source requires source or input'],
+    ['overlay.alert', {}, 'overlay.alert requires message'],
+    ['overlay.emit', {}, 'overlay.emit requires event'],
+    ['sound.play', {}, 'sound.play requires src or path']
+  ]
+
+  for (const [type, fields, message] of requiredFields) {
+    assert.throws(
+      () => validateActionStructure({ type, ...fields }),
+      error => error.statusCode === 400 && error.message === message,
+      message
+    )
+  }
 })
 
 test('delay actions cap positive waits at ten minutes', async () => {
