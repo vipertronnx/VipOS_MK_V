@@ -3,6 +3,14 @@ const path = require('path')
 
 const defaultProjectRoot = path.resolve(__dirname, '..')
 
+/**
+ * Validates repository Markdown structure, local links, and documented environment variables.
+ *
+ * @param {object} [options] Documentation check configuration.
+ * @param {string} [options.projectRoot] Repository root containing docs and environment references.
+ * @returns {{errors: string[], markdownFiles: string[]}} Checked Markdown files and all detected failures.
+ * @throws {Error} Throws when required repository files cannot be read or a local link contains invalid percent encoding.
+ */
 function checkDocumentation({ projectRoot = defaultProjectRoot } = {}) {
   const markdownFiles = [
     path.join(projectRoot, 'README.md'),

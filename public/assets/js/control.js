@@ -17,6 +17,13 @@ const obsMediaInputSelect = document.querySelector('[data-obs-media-inputs]');
 
 let obsDiscovery = null;
 
+/**
+ * Fetches and parses a successful JSON response from a control API endpoint.
+ *
+ * @param {string} endpoint Relative or absolute API endpoint.
+ * @returns {Promise<*>} Parsed JSON response.
+ * @throws {Error} Rejects for network failures, invalid JSON, or an unsuccessful response status.
+ */
 async function getJson(endpoint) {
   const response = await fetch(endpoint);
   const payload = await response.json();
@@ -28,6 +35,14 @@ async function getJson(endpoint) {
   return payload;
 }
 
+/**
+ * Sends a JSON request to a control API endpoint and requires a JSON response when a body is returned.
+ *
+ * @param {string} endpoint Relative or absolute API endpoint.
+ * @param {*} [data={}] JSON-serializable request body.
+ * @returns {Promise<*>} Parsed response, or an `{ ok }` object for an empty response body.
+ * @throws {Error} Rejects for network failures, serialization failures, invalid JSON responses, or unsuccessful status codes.
+ */
 async function postJson(endpoint, data = {}) {
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -52,6 +67,13 @@ async function postJson(endpoint, data = {}) {
   return payload;
 }
 
+/**
+ * Converts a control form into an API payload, honoring raw-JSON and JSON-field opt-ins.
+ *
+ * @param {HTMLFormElement} form Submitted control form.
+ * @returns {*} Parsed raw JSON, or an object built from non-empty form fields.
+ * @throws {Error} Throws when required raw JSON or a JSON-designated field cannot be parsed.
+ */
 function formDataToJson(form) {
   if (form.hasAttribute('data-raw-json')) {
     const field = form.querySelector('textarea, input');
@@ -125,6 +147,11 @@ function statusBadge(label, online) {
   return `<span class="status-pill ${online ? 'is-online' : 'is-offline'}">${escapeHtml(label)}</span>`;
 }
 
+/**
+ * Renders the running, pending, and recent action queue state into the control panel.
+ *
+ * @param {object|null|undefined} queue Queue status snapshot returned by the API; absent values render an unavailable state.
+ */
 function renderQueue(queue) {
   if (!queueStatusEl) return;
 

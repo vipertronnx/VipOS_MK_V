@@ -1,6 +1,13 @@
 const fs = require('fs')
 const path = require('path')
 
+/**
+ * Reads the duration of a WAV, MP3, or OGG/Vorbis file from its encoded metadata and frames.
+ *
+ * @param {string} filePath Path to an audio file with a supported extension.
+ * @returns {number|null} Duration in milliseconds, or `null` when the format or duration cannot be determined.
+ * @throws {Error} Throws when the file cannot be read.
+ */
 function getAudioDurationMs(filePath) {
   const ext = path.extname(filePath).toLowerCase()
   const buffer = fs.readFileSync(filePath)
@@ -12,6 +19,12 @@ function getAudioDurationMs(filePath) {
   return null
 }
 
+/**
+ * Calculates WAV duration from the format chunk's byte rate and the data chunk size.
+ *
+ * @param {Buffer} buffer Complete WAV file contents.
+ * @returns {number|null} Duration in milliseconds, or `null` for malformed or incomplete headers.
+ */
 function readWavDurationMs(buffer) {
   if (buffer.length < 44) return null
   if (buffer.toString('ascii', 0, 4) !== 'RIFF') return null
@@ -39,6 +52,12 @@ function readWavDurationMs(buffer) {
   return Math.round((dataSize / byteRate) * 1000)
 }
 
+/**
+ * Estimates MP3 duration by scanning valid frame headers after any ID3v2 tag.
+ *
+ * @param {Buffer} buffer Complete MP3 file contents.
+ * @returns {number|null} Duration in milliseconds, or `null` when no valid frames are found.
+ */
 function readMp3DurationMs(buffer) {
   let offset = skipId3v2(buffer)
   let durationSeconds = 0
@@ -134,6 +153,12 @@ function getMp3SamplesPerFrame(version, layer) {
   return version === '1' ? 1152 : 576
 }
 
+/**
+ * Calculates OGG/Vorbis duration from the final valid page granule position.
+ *
+ * @param {Buffer} buffer Complete OGG file contents.
+ * @returns {number|null} Duration in milliseconds, or `null` when Vorbis metadata or granules are unavailable.
+ */
 function readOggDurationMs(buffer) {
   const sampleRate = readVorbisSampleRate(buffer)
   if (!sampleRate) return null

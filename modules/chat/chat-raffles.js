@@ -15,6 +15,15 @@ const DEFAULT_ALERT_SOUND = 'example.mp3'
 const DEFAULT_ENTRY_COMMAND = '!join'
 const DEFAULT_POINTS_COMMAND = '!points'
 
+/**
+ * Creates the persisted, timer-driven chat raffle service.
+ *
+ * @param {object} [options] Announcement callbacks, state location, and raffle settings.
+ * @param {Function} [options.announce] Async action announcer used for regular raffle messages.
+ * @param {Function} [options.announceImmediate] Announcer used for time-sensitive notices.
+ * @param {string} [options.stateFile] JSON file used to restore and persist raffle state.
+ * @returns {object} Raffle lifecycle, entry, status, and chat-message operations.
+ */
 function createRaffleService({
   logger = console,
   announce = async () => {},
@@ -152,6 +161,14 @@ function createRaffleService({
     return getStatus()
   }
 
+  /**
+   * Consumes configured raffle chat commands when the raffle service is enabled.
+   * Entry commands update persisted raffle state; points commands await the configured announcement callback.
+   *
+   * @param {object} [context={}] Chat context containing at least the incoming message and user identity.
+   * @returns {Promise<boolean>} `true` when a raffle command was recognized and handled.
+   * @throws {Error} Rejects when a points-query announcement fails; entry announcements report failures through raffle state instead.
+   */
   async function handleChatMessage(context = {}) {
     if (!state.enabled) return false
 
@@ -464,6 +481,14 @@ function createRaffleService({
   }
 }
 
+/**
+ * Restores raffle state and merges persisted settings with current runtime settings.
+ *
+ * @param {string} stateFile JSON state file path.
+ * @param {object} settings Current environment or caller-provided settings.
+ * @param {object} [logger=console] Logger exposing `warn` when stored state cannot be read or parsed.
+ * @returns {object} Complete mutable raffle state with normalized settings.
+ */
 function loadState(stateFile, settings, logger = console) {
   const stored = readJson(stateFile, logger)
   const now = nowIso()

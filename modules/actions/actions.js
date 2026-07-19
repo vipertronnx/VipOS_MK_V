@@ -33,6 +33,12 @@ const soundListCache = new Map()
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+/**
+ * Validates a relative local sound path without permitting traversal or unsupported extensions.
+ *
+ * @param {*} src Candidate path using forward-slash directory separators.
+ * @returns {string|null} Trimmed MP3, OGG, or WAV path, or `null` when invalid.
+ */
 function validateSoundSrc(src) {
   if (typeof src !== 'string') return null
 
@@ -43,6 +49,15 @@ function validateSoundSrc(src) {
   return normalized
 }
 
+/**
+ * Recursively scans supported sounds for the control interface and caches the resulting metadata.
+ *
+ * @param {object} [options] Sound directory, cache, warning, and logging settings.
+ * @param {string} [options.soundDirectory] Root directory containing local sound assets.
+ * @param {number} [options.cacheTtlMs=5000] List-cache lifetime in milliseconds; non-positive values force a directory rescan while unchanged duration entries may remain cached.
+ * @param {number} [options.largeSoundWarningBytes=26214400] File size in bytes above which duration reads emit a warning.
+ * @returns {Array<object>} Sorted metadata with relative source paths and `durationMs: null` when duration detection fails.
+ */
 function listSoundFiles({
   cacheTtlMs = SOUND_LIST_CACHE_TTL_MS,
   largeSoundWarningBytes = DEFAULT_LARGE_SOUND_WARNING_BYTES,
@@ -71,6 +86,14 @@ function listSoundFiles({
   return cloneSoundList(sounds)
 }
 
+/**
+ * Creates the action dispatcher used by chat automation, macros, and manual control routes.
+ *
+ * @param {object} options Runtime services and configurable local asset dependencies.
+ * @param {object} options.io Socket server used for overlay and sound events.
+ * @param {object} options.obs OBS service used by OBS action types.
+ * @returns {{run: Function, setChatService: Function, validateStructure: Function}} Action execution API.
+ */
 function createActionRunner({
   io,
   obs,
@@ -103,6 +126,15 @@ function createActionRunner({
     chatService = service
   }
 
+  /**
+   * Validates and executes actions sequentially against a shared context that picker actions may extend.
+   * Depending on action type, execution can wait, send chat or OBS requests, emit socket events, and read local sound configuration.
+   *
+   * @param {object|Array<object>} actions One action or ordered action list.
+   * @param {object} [context={}] Event data available to placeholders and context-picking actions.
+   * @returns {Promise<Array<object>>} Results in the same order as the executed actions.
+   * @throws {Error} Rejects when an action is invalid or its executor fails.
+   */
   async function run(actions, context = {}) {
     const actionList = validateActionStructure(actions)
     const hasExplicitSoundAction = actionList.some(isSoundAction)
@@ -293,6 +325,13 @@ function maybePlayAlertSound(action, context, { hasExplicitSoundAction = false }
   return { type: 'sound.play', src, volume, durationMs, source: 'overlay.alert' }
 }
 
+/**
+ * Checks action objects and required fields before a queue or dispatcher accepts them.
+ *
+ * @param {object|Array<object>} actions One action or action list using a supported `type` or `action` field.
+ * @returns {Array<object>} The supplied actions normalized to an array without cloning items.
+ * @throws {Error} Throws a client input error for invalid objects, unknown types, or missing required fields.
+ */
 function validateActionStructure(actions) {
   const actionList = Array.isArray(actions) ? actions : [actions]
   if (!actionList.length) throw userInputError('At least one action is required')
@@ -333,6 +372,13 @@ function hasActionValue(value) {
   return value !== undefined && value !== null && value !== ''
 }
 
+/**
+ * Replaces `{path.to.value}` placeholders throughout a value using the event context.
+ *
+ * @param {*} value String, array, object, or scalar action value to hydrate.
+ * @param {object} context Source data for dot-separated placeholders.
+ * @returns {*} Hydrated value; arrays and non-null objects are recreated from their enumerable properties.
+ */
 function hydrate(value, context) {
   if (typeof value === 'string') {
     return value.replace(/\{([a-zA-Z0-9_.-]+)\}/g, (_, key) => {
@@ -455,6 +501,16 @@ function isViewerTriggeredContext(context = {}) {
   ].includes(context.source)
 }
 
+/**
+ * Selects a configured sound present in the local sound directory and derives its display text.
+ *
+ * @param {object} options Candidate sound source and configured filename-to-text mapping.
+ * @param {string} options.soundDirectory Directory containing selectable files.
+ * @param {Record<string, string>} [options.textMap={}] Display text keyed by eligible filename.
+ * @param {string[]} [options.eligibleFilenames=[]] Filenames allowed by configured text maps.
+ * @returns {{filename: string, name: string, src: string, text: string}} Selected sound metadata.
+ * @throws {Error} Throws a client input error when the directory cannot be read or has no eligible sound.
+ */
 function pickRandomSound({ soundDirectory, textMap = {}, eligibleFilenames = [] }) {
   let entries
 
@@ -552,6 +608,15 @@ function getCachedSoundDurationMs(src, soundDirectory, stat, logger, durationCac
   return durationMs
 }
 
+/**
+ * Reads and caches a sound's duration, warning before reading files above the configured size threshold.
+ *
+ * @param {string} src Validated relative sound path.
+ * @param {string} soundDirectory Root directory used to resolve `src`.
+ * @param {object} [logger=console] Logger exposing `warn` for read failures or oversized files.
+ * @param {number} [largeSoundWarningBytes=26214400] File size in bytes above which a warning is logged before the duration read.
+ * @returns {number|null} Duration in milliseconds, or `null` when the path is invalid or duration detection fails.
+ */
 function getSoundDurationMs(
   src,
   soundDirectory,
@@ -579,6 +644,14 @@ function getSoundDurationMs(
   }
 }
 
+/**
+ * Ensures a validated relative sound path resolves to a regular file beneath the sound directory.
+ *
+ * @param {string} src Relative local sound path.
+ * @param {string} [soundDirectory] Directory permitted to contain the file; defaults to the public sound asset directory.
+ * @returns {void}
+ * @throws {Error} Throws a client input error for unsafe, missing, or non-file targets.
+ */
 function assertSoundFileExists(src, soundDirectory = DEFAULT_SOUND_DIRECTORY) {
   const filePath = resolveSoundPath(src, soundDirectory)
   if (!filePath) {

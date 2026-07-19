@@ -1,6 +1,15 @@
 const { normalizeCompletionDelay } = require('../utils/completion-delay')
 const { userInputError } = require('../utils/errors')
 
+/**
+ * Creates a serial action queue that records execution history and waits for sound completion when needed.
+ *
+ * @param {object} options Queue dependencies and timing settings.
+ * @param {object} options.actions Action runner exposing `run` and optionally `validateStructure`.
+ * @param {number} [options.soundCompletionBufferMs=250] Extra milliseconds added after a known sound duration.
+ * @param {number} [options.soundCompletionFallbackMs=4000] Delay used when a sound duration cannot be determined.
+ * @returns {object} Queue controls and a snapshot-based status accessor.
+ */
 function createActionQueue({
   actions,
   logger = console,
@@ -19,6 +28,15 @@ function createActionQueue({
   let running = null
   let processing = false
 
+  /**
+   * Adds actions to the queue and initiates background processing unless it is paused.
+   *
+   * @param {object} item Queued action definition.
+   * @param {object|Array<object>} item.actions Action or action list; validated first when the runner exposes `validateStructure`.
+   * @param {number} [item.completionDelayMs] Explicit post-run delay in milliseconds; `delayMs` is accepted as an alias.
+   * @returns {object} Immediate queue snapshot; action completion is reported later through queue status and history.
+   * @throws {Error} Throws when actions are missing or fail runner validation.
+   */
   function enqueue({
     name,
     actions: actionList,
@@ -194,6 +212,14 @@ function getActionCount(actions) {
   return Array.isArray(actions) ? actions.length : 1
 }
 
+/**
+ * Selects the wait time after an item, preferring its explicit delay and otherwise deriving one from sound results.
+ *
+ * @param {object} item Queue item with normalized delay settings.
+ * @param {*} results Values returned by the action runner, including nested result arrays.
+ * @param {number} soundCompletionBufferMs Extra milliseconds after the longest detected sound.
+ * @returns {number} Completion delay in milliseconds.
+ */
 function resolveCompletionDelayMs(item, results, soundCompletionBufferMs) {
   if (item.completionDelayMs !== null) return item.completionDelayMs
 

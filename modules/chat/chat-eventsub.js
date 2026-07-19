@@ -1,5 +1,12 @@
 const { createRetryScheduler } = require('./chat-retry')
 
+/**
+ * Creates an EventSub WebSocket lifecycle that retries failed reward subscriptions independently.
+ *
+ * @param {object} options EventSub configuration and lifecycle callbacks.
+ * @param {object} options.config Retry interval configuration.
+ * @returns {object} Listener start/stop operations and current subscription-state accessors.
+ */
 function createEventSubLifecycle({
   config,
   logger = console,
@@ -32,6 +39,14 @@ function createEventSubLifecycle({
     }
   })
 
+  /**
+   * Registers configured subscriptions and starts a newly constructed EventSub listener.
+   *
+   * @param {object} options Listener constructor, API client, authentication IDs, and registration callbacks.
+   * @param {Array<object>} [options.registrations=[]] Subscription registrations to attach before starting.
+   * @returns {void}
+   * @throws {Error} Throws when listener construction, registration, or startup fails synchronously.
+   */
   function start({
     apiClient,
     EventSubWsListener,

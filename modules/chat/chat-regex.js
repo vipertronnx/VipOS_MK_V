@@ -2,6 +2,13 @@
 const MAX_HANDLER_REGEX_INPUT_LENGTH = 500
 const MAX_HANDLER_REGEX_PATTERN_LENGTH = 200
 
+/**
+ * Returns an existing regular expression unchanged, or compiles a string after bounded-pattern safety checks.
+ *
+ * @param {string|RegExp} value Literal `/pattern/flags` notation, bare pattern, or existing expression.
+ * @returns {RegExp|null} Compiled expression, or `null` for an empty value.
+ * @throws {Error} Throws when a string pattern has invalid syntax or flags, exceeds the length limit, or contains nested quantifiers.
+ */
 function normalizeRegex(value) {
   if (value instanceof RegExp) return value
 
@@ -20,6 +27,13 @@ function normalizeRegex(value) {
   }
 }
 
+/**
+ * Tests a handler expression against a bounded prefix of user-provided input.
+ *
+ * @param {RegExp} pattern Compiled handler expression; its `lastIndex` is reset before testing.
+ * @param {*} value Input value to test.
+ * @returns {boolean} Whether the pattern matches the first 500 characters of the normalized input.
+ */
 function testRegex(pattern, value) {
   pattern.lastIndex = 0
   return pattern.test(String(value || '').slice(0, MAX_HANDLER_REGEX_INPUT_LENGTH))

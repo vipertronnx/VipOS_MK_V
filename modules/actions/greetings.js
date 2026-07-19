@@ -10,6 +10,14 @@ const DEFAULT_SETTINGS_FILE = path.join(__dirname, '..', '..', 'config', 'greeti
 const CONFIG_DIRECTORY = path.join(__dirname, '..', '..', 'config')
 const FALLBACK_POOL = 'all'
 
+/**
+ * Creates a greeting-pool service backed by JSON configuration and persisted active-pool settings.
+ *
+ * @param {object} [options] File locations and logging dependency.
+ * @param {string} [options.greetingsFile] JSON catalog containing named greeting pools.
+ * @param {string} [options.settingsFile] JSON file used to persist the selected pool.
+ * @returns {object} Operations for listing pool status, selecting a greeting, and updating the active pool.
+ */
 function createGreetingService({
   greetingsFile = DEFAULT_GREETINGS_FILE,
   settingsFile = DEFAULT_SETTINGS_FILE,
@@ -31,6 +39,15 @@ function createGreetingService({
     }
   }
 
+  /**
+   * Selects one greeting at random from a configured pool.
+   *
+   * @param {object} [options] Optional source-file and pool overrides.
+   * @param {string} [options.pool] Pool name; unknown explicitly requested pools are rejected.
+   * @param {string} [options.file] Relative JSON file path constrained to the config directory.
+   * @returns {{pool: string, value: string}} Selected pool and greeting text.
+   * @throws {Error} Throws for invalid file overrides, unknown explicitly requested pools, or empty selected pools.
+   */
   function pick(options = {}) {
     const file = resolveConfigJsonPath(options.file, greetingsFile)
     const catalog = loadCatalog(file, logger)
@@ -87,6 +104,13 @@ function createGreetingService({
   }
 }
 
+/**
+ * Loads and normalizes a greeting catalog. A missing primary catalog uses the example when available; other missing or unreadable sources produce an empty default pool.
+ *
+ * @param {string} file Catalog file to read.
+ * @param {object} [logger=console] Logger exposing `warn` for read or parse failures.
+ * @returns {{defaultPool: string, pools: Record<string, string[]>}} Normalized catalog.
+ */
 function loadCatalog(file, logger = console) {
   if (!file || !fs.existsSync(file)) {
     if (file === DEFAULT_GREETINGS_FILE && fs.existsSync(DEFAULT_GREETINGS_EXAMPLE_FILE)) {
@@ -154,6 +178,14 @@ function normalizePoolName(value) {
   return String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '-')
 }
 
+/**
+ * Resolves a user-provided greeting file only when it remains a JSON file within the config directory.
+ *
+ * @param {string} value Relative file path, optionally prefixed with `config/`.
+ * @param {string} fallback Path used when no override is supplied.
+ * @returns {string} Validated absolute configuration path.
+ * @throws {Error} Throws when the path is absolute, escapes config, or is not JSON.
+ */
 function resolveConfigJsonPath(value, fallback) {
   if (!value) return fallback
 

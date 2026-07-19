@@ -1,4 +1,11 @@
 // Pure Twitch event context mapping and dashboard summaries.
+/**
+ * Maps an incoming Twitch chat message into the shared automation context shape.
+ *
+ * @param {object} event Twurple chat event.
+ * @param {object} state Chat service state containing the broadcaster identifier.
+ * @returns {object} Context with chat metadata, normalized roles, and message fields.
+ */
 function createMessageContext(event, state) {
   const badges = event.badges || {}
   const roles = getRoles({
@@ -48,6 +55,12 @@ function createMessageContext(event, state) {
   }
 }
 
+/**
+ * Converts a chat message context into a chat-entry event and retains any moderator or VIP roles.
+ *
+ * @param {object} context Existing chat message context.
+ * @returns {object} Context augmented with entry timestamp and moderator/VIP roles.
+ */
 function createChatEntryContext(context) {
   const entryRoles = getPrivilegedEntryRoles(context.roles)
   const role = entryRoles[0] || ''
@@ -70,6 +83,13 @@ function createChatEntryContext(context) {
   }
 }
 
+/**
+ * Maps a custom channel-point redemption event into an automation context.
+ *
+ * @param {string} eventName Canonical redemption event name.
+ * @param {object} event Twurple redemption event.
+ * @returns {object} Context containing redemption, reward, user, and input details.
+ */
 function createRedemptionContext(eventName, event) {
   const input = event.input || ''
   const redeemedAt = dateToIso(event.redemptionDate)
@@ -102,6 +122,12 @@ function createRedemptionContext(eventName, event) {
   }
 }
 
+/**
+ * Maps a Twitch automatic reward redemption into an automation context.
+ *
+ * @param {object} event Twurple automatic-redemption event.
+ * @returns {object} Context with fulfilled redemption status and automatic reward details.
+ */
 function createAutomaticRedemptionContext(event) {
   const reward = event.reward
   const message = event.messageText || ''
@@ -141,6 +167,13 @@ function createAutomaticRedemptionContext(event) {
   }
 }
 
+/**
+ * Maps a channel-point reward lifecycle event into an automation context.
+ *
+ * @param {string} eventName Canonical reward event name.
+ * @param {object} event Twurple reward event.
+ * @returns {object} Context containing the reward settings supplied by Twitch.
+ */
 function createRewardEventContext(eventName, event) {
   return {
     broadcaster: event.broadcasterName,
@@ -172,6 +205,12 @@ function createRewardEventContext(eventName, event) {
   }
 }
 
+/**
+ * Maps a Twitch follow event into an automation context.
+ *
+ * @param {object} event Twurple follow event.
+ * @returns {object} Context containing follower identity and ISO-formatted follow time when valid.
+ */
 function createFollowContext(event) {
   const followedAt = dateToIso(event.followDate)
 
@@ -195,6 +234,12 @@ function createFollowContext(event) {
   }
 }
 
+/**
+ * Maps a Twitch raid event into an automation context.
+ *
+ * @param {object} event Twurple raid event.
+ * @returns {object} Context containing raid source, target, and viewer count.
+ */
 function createRaidContext(event) {
   return {
     broadcaster: event.raidedBroadcasterName,
@@ -220,6 +265,12 @@ function createRaidContext(event) {
   }
 }
 
+/**
+ * Maps a Twitch subscription event into an automation context.
+ *
+ * @param {object} event Twurple subscription event.
+ * @returns {object} Context containing subscriber identity, tier, and gift flag.
+ */
 function createSubscriptionContext(event) {
   return {
     broadcaster: event.broadcasterName,
@@ -244,6 +295,12 @@ function createSubscriptionContext(event) {
   }
 }
 
+/**
+ * Maps a Twitch subscription-gift event into an automation context, using anonymous top-level user identity when required.
+ *
+ * @param {object} event Twurple subscription-gift event.
+ * @returns {object} Context containing gift details and an anonymous placeholder when required.
+ */
 function createSubscriptionGiftContext(event) {
   const displayName = event.isAnonymous ? 'Anonymous' : event.gifterDisplayName
   const username = event.isAnonymous ? 'anonymous' : event.gifterName
@@ -276,6 +333,12 @@ function createSubscriptionGiftContext(event) {
   }
 }
 
+/**
+ * Selects redemption fields used by dashboard event summaries.
+ *
+ * @param {object} context Redemption automation context.
+ * @returns {object} Compact redemption summary.
+ */
 function summarizeRedemptionContext(context) {
   return {
     automaticReward: context.automaticReward || null,
@@ -291,6 +354,12 @@ function summarizeRedemptionContext(context) {
   }
 }
 
+/**
+ * Selects reward lifecycle fields for a dashboard event summary.
+ *
+ * @param {object} context Reward automation context.
+ * @returns {object} Event name and reward details.
+ */
 function summarizeRewardEventContext(context) {
   return {
     event: context.event,
@@ -298,6 +367,12 @@ function summarizeRewardEventContext(context) {
   }
 }
 
+/**
+ * Selects follow, raid, or subscription fields for a dashboard event summary.
+ *
+ * @param {object} context Community-event automation context.
+ * @returns {object} Compact user and event-specific summary.
+ */
 function summarizeCommunityEventContext(context) {
   return {
     displayName: context.displayName,
@@ -310,6 +385,12 @@ function summarizeCommunityEventContext(context) {
   }
 }
 
+/**
+ * Selects chat-entry identity and privileged-role fields for the dashboard.
+ *
+ * @param {object} context Chat-entry automation context.
+ * @returns {object} Compact entry summary.
+ */
 function summarizeChatEntryContext(context) {
   return {
     displayName: context.displayName,
@@ -320,6 +401,12 @@ function summarizeChatEntryContext(context) {
   }
 }
 
+/**
+ * Extracts the moderator and VIP roles that qualify a chatter for entry automation.
+ *
+ * @param {string[]} roles Raw or normalized role names.
+ * @returns {string[]} Present privileged roles in moderator-then-VIP order.
+ */
 function getPrivilegedEntryRoles(roles) {
   const actual = new Set((roles || []).map(normalizeRole))
   return ['moderator', 'vip'].filter(role => actual.has(role))
@@ -340,6 +427,12 @@ function getRoles({ badges, broadcasterId, chatterId }) {
   return [...roles]
 }
 
+/**
+ * Normalizes role aliases used by command configuration and chat badges.
+ *
+ * @param {*} role Role name or alias such as `mod`, `sub`, `all`, or `*`.
+ * @returns {string} Canonical alias when recognized, otherwise the trimmed lower-case role name.
+ */
 function normalizeRole(role) {
   const normalized = String(role || '').trim().toLowerCase()
   const aliases = {

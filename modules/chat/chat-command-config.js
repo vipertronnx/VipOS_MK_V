@@ -5,6 +5,14 @@ const {
   normalizeCommand
 } = require('./chat-normalization')
 
+/**
+ * Creates a reloadable command-configuration snapshot backed by a JSON file watcher.
+ *
+ * @param {object} options Command file, prefix, filesystem adapter, and lifecycle callbacks.
+ * @param {string} options.commandsFile JSON automation configuration file to load and watch.
+ * @param {string} options.commandPrefix Prefix used while normalizing command names.
+ * @returns {object} Methods to load, read, watch, and stop watching the latest valid snapshot.
+ */
 function createCommandConfigLifecycle({
   commandPrefix,
   commandsFile,
@@ -18,6 +26,11 @@ function createCommandConfigLifecycle({
   let snapshot = createEmptySnapshot()
   let watching = false
 
+  /**
+   * Loads a fresh snapshot, keeping the previous valid snapshot if parsing or normalization fails.
+   *
+   * @returns {Promise<object>} Current snapshot; empty when the file is absent.
+   */
   async function load() {
     if (!fileSystem.existsSync(commandsFile)) {
       snapshot = createEmptySnapshot()

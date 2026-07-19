@@ -10,6 +10,11 @@ const right = document.querySelector('#text-alert-bg .right');
 const sanitize = t => (t || '').replace(/'/gi, '');
 const setText = t => { if (header && header.textContent !== t) header.textContent = t; };
 
+/**
+ * Shows an overlay alert when the required elements exist, replacing pending animation timers from an earlier alert.
+ *
+ * @param {string} text Alert content; apostrophes are removed before the heading is updated.
+ */
 function showAlert(text) {
   if (!header || !left || !right) return;
   const sanitized = sanitize(text);

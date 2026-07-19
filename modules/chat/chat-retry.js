@@ -1,3 +1,12 @@
+/**
+ * Creates a single-timer exponential-backoff scheduler.
+ *
+ * @param {object} options Retry bounds, callbacks, and optional timer adapters.
+ * @param {number} options.initialMs Delay for the first retry in milliseconds.
+ * @param {number} options.maxMs Maximum retry delay in milliseconds.
+ * @param {Function} options.onRetry Callback invoked after each scheduled delay.
+ * @returns {object} Scheduling, reset, and pending-state operations.
+ */
 function createRetryScheduler({
   initialMs,
   maxMs,

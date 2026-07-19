@@ -34,6 +34,11 @@ const DEFAULT_FIXTURES = {
   'subscription-gift': path.join(__dirname, '..', 'fixtures', 'twitch', 'subscription-gift.json')
 }
 
+/**
+ * Runs a fixture-based or live API simulation of a supported Twitch community event.
+ *
+ * @returns {Promise<void>}
+ */
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const eventType = normalizeEventType(options.eventType)
@@ -105,6 +110,12 @@ async function main() {
   }
 }
 
+/**
+ * Parses the simulation CLI's positional event and fixture arguments plus supported overrides.
+ *
+ * @param {string[]} args Arguments after the Node script path.
+ * @returns {object} Event type, optional fixture, live URL, count, and tier options.
+ */
 function parseArgs(args) {
   const options = {
     baseUrl: `http://127.0.0.1:${Number(process.env.PORT) || 5000}`,
@@ -148,6 +159,16 @@ function applyFixtureOverrides(event, options) {
   }
 }
 
+/**
+ * Sends a fixture payload to the running application's Twitch simulation endpoint.
+ *
+ * @param {string} eventType Canonical event type accepted by the API.
+ * @param {object} event Fixture payload to submit as JSON.
+ * @param {string} fixtureFile Source file displayed in command output.
+ * @param {string} baseUrl Base URL of the locally running application.
+ * @returns {Promise<void>}
+ * @throws {Error} Rejects for network failures, unsuccessful responses, or successful responses that are not JSON objects.
+ */
 async function simulateLiveEvent(eventType, event, fixtureFile, baseUrl) {
   const url = `${baseUrl.replace(/\/$/, '')}/api/v1/twitch/simulate/${encodeURIComponent(eventType)}`
   const response = await fetch(url, {
@@ -258,6 +279,12 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+/**
+ * Parses an HTTP response only when it is a JSON object.
+ *
+ * @param {string} text Response body text.
+ * @returns {object|null} Parsed object, or `null` for empty, invalid, or non-object JSON.
+ */
 function parseResponseText(text) {
   if (!text) return null
 
@@ -269,12 +296,27 @@ function parseResponseText(text) {
   }
 }
 
+/**
+ * Formats an unsuccessful fetch response with its JSON error or a shortened text-body fallback.
+ *
+ * @param {Response} response Fetch response that failed.
+ * @param {object} payload Parsed JSON response object when available.
+ * @param {string} text Raw response text.
+ * @returns {string} Status text with optional error detail.
+ */
 function formatHttpError(response, payload, text) {
   const detail = payload.error || summarizeResponseText(text)
   const status = `${response.status} ${response.statusText}`
   return detail ? `${status}: ${detail}` : status
 }
 
+/**
+ * Converts arbitrary response text to a single-line, length-bounded diagnostic.
+ *
+ * @param {*} text Response text to summarize.
+ * @param {number} [maxLength=200] Maximum retained character count before an ellipsis is appended.
+ * @returns {string} Whitespace-normalized diagnostic text.
+ */
 function summarizeResponseText(text, maxLength = 200) {
   const normalized = String(text || '').replace(/\s+/g, ' ').trim()
   if (!normalized) return ''

@@ -3,6 +3,13 @@ const path = require('path')
 
 let nextTemporaryFileId = 1
 
+/**
+ * Writes formatted JSON to a sibling temporary file before replacing the destination.
+ *
+ * @param {string} file Destination file path; missing parent directories are created.
+ * @param {*} value JSON-serializable value to persist.
+ * @throws {Error} Rethrows filesystem or serialization failures after attempting temporary-file cleanup.
+ */
 function writeJsonFile(file, value) {
   const tempFile = `${file}.${process.pid}.${Date.now()}.${nextTemporaryFileId++}.tmp`
 
@@ -16,6 +23,13 @@ function writeJsonFile(file, value) {
   }
 }
 
+/**
+ * Wraps a storage failure as a service-unavailable error while preserving its cause.
+ *
+ * @param {string} label Operation-specific context for the error message.
+ * @param {Error} cause Underlying persistence failure.
+ * @returns {Error & {cause: Error, statusCode: number}} Error marked with HTTP status code 503.
+ */
 function createPersistenceError(label, cause) {
   const error = new Error(`${label}: ${cause.message}`)
   error.cause = cause
@@ -23,6 +37,13 @@ function createPersistenceError(label, cause) {
   return error
 }
 
+/**
+ * Replaces a target file by rename, with a copy-and-delete fallback for access or permission failures.
+ *
+ * @param {string} tempFile Completed temporary file path.
+ * @param {string} targetFile File to replace.
+ * @throws {Error} Throws for non-permission rename failures or unsuccessful fallback copy/delete operations.
+ */
 function replaceFile(tempFile, targetFile) {
   try {
     fs.renameSync(tempFile, targetFile)

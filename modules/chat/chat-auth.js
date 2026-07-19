@@ -12,6 +12,17 @@ const REDEMPTION_SCOPES = ['channel:read:redemptions', 'channel:manage:redemptio
 const FOLLOW_SCOPES = ['moderator:read:followers']
 const SUBSCRIPTION_SCOPES = ['channel:read:subscriptions']
 
+/**
+ * Creates Twurple authentication from token files or configured credentials.
+ * Refreshing providers register callbacks that persist later token updates and log refresh failures.
+ *
+ * @param {object} twurple Twurple auth constructors and token-info loader.
+ * @param {object} config Normalized Twitch credential and token-file configuration.
+ * @param {object} logger Logger exposing `warn` and `error` for scope and refresh diagnostics.
+ * @param {object} [options] EventSub-derived broadcaster and scope requirements.
+ * @returns {Promise<object>} Auth provider, bot user ID, optional broadcaster user ID, and authentication mode.
+ * @throws {Error} Rejects for invalid configuration, unreadable token files, or Twurple authentication failures.
+ */
 async function createAuthProvider(twurple, config, logger, options = {}) {
   if (!config.clientId) throw new ChatConfigError('TWITCH_CLIENT_ID is required when CHAT_ENABLED=true')
   const needsBroadcasterToken = Boolean(options.needsBroadcasterToken)
@@ -122,6 +133,12 @@ async function createAuthProvider(twurple, config, logger, options = {}) {
   return { authProvider, botUserId, mode: 'static' }
 }
 
+/**
+ * Reads Twitch authentication settings from an environment-like object.
+ *
+ * @param {object} [env=process.env] Environment values containing Twitch credentials and file overrides.
+ * @returns {object} Normalized credential, scope, timestamp, and absolute token-file settings.
+ */
 function readAuthConfig(env = process.env) {
   return {
     botAccessToken: env.TWITCH_BOT_ACCESS_TOKEN || env.TWITCH_BOT_TOKEN,
@@ -157,10 +174,23 @@ class TokenConfigError extends ChatConfigError {
   }
 }
 
+/**
+ * Identifies configuration errors that should prevent automatic chat startup retries.
+ *
+ * @param {*} error Startup failure to classify.
+ * @returns {boolean} Whether the error is a `ChatConfigError` or subclass.
+ */
 function isNonRetryableStartupError(error) {
   return error instanceof ChatConfigError
 }
 
+/**
+ * Reads supported camelCase and snake_case fields from a persisted Twitch token file.
+ *
+ * @param {string} tokenFile Absolute token JSON file path.
+ * @returns {object} Normalized token fields, or an empty object when the file is absent.
+ * @throws {Error} Throws a `TokenConfigError` for invalid JSON or a non-object document; filesystem read failures propagate unchanged.
+ */
 function readTokenConfig(tokenFile) {
   if (!tokenFile || !fs.existsSync(tokenFile)) return {}
 

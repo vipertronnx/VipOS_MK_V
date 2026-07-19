@@ -50,6 +50,15 @@ const DEFAULT_RECONNECT_INITIAL_MS = 5000
 const DEFAULT_RECONNECT_MAX_MS = 60000
 let twurpleModules = null
 
+/**
+ * Creates the Twitch chat and EventSub runtime, including command reloads and simulation support.
+ *
+ * @param {object} options Action services and optional runtime adapters.
+ * @param {object} options.actions Action runner used by chat automation.
+ * @param {object|null} [options.actionQueue] Queue used to serialize automation actions.
+ * @param {object|null} [options.raffle] Raffle service allowed to consume chat commands first.
+ * @returns {object} Start/stop, status, chat-send, and supported-event simulation operations.
+ */
 function createChatService({ actions, actionQueue = null, commandConfigFileSystem, logger = console, onReady = null, raffle = null, twurpleLoader = loadTwurple } = {}) {
   if (!actions) throw new Error('Chat service requires an action runner')
 
@@ -280,6 +289,14 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
     }
   }
 
+  /**
+   * Sends a chat message or records a simulated send while simulation is active.
+   *
+   * @param {string} message Non-empty message text to send.
+   * @param {object} [options] Optional simulation and reply-parent settings.
+   * @returns {Promise<object>} Twitch send result or a simulated result with a generated ID.
+   * @throws {Error} Rejects when chat is not ready, the message is empty, or Twitch fails to send it.
+   */
   async function say(message, options = {}) {
     if (options.simulated || state.simulating) {
       const text = String(message || '').trim()
@@ -574,6 +591,15 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
     state.lastCommunityEventMatchedHandlers = await automation.runConfiguredHandlers(handlers, context)
   }
 
+  /**
+   * Dispatches a supported community EventSub payload through its normal automation handler without Twitch connectivity.
+   * When an action queue is configured, the promise resolves after matching actions are enqueued, not after queue completion.
+   *
+   * @param {string} type Supported event name or alias for follow, raid, or subscription events.
+   * @param {object} event Event payload shaped like the corresponding Twurple event.
+   * @returns {Promise<void>} Resolves after matching handlers have been dispatched.
+   * @throws {Error} Rejects for unsupported event types or failures from matching automation handlers.
+   */
   async function simulateEvent(type, event) {
     state.simulating = true
     await commandConfig.load()

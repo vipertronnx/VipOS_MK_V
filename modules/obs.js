@@ -1,6 +1,13 @@
 const { default: OBSWebSocket } = require('obs-websocket-js')
 const { userInputError } = require('./utils/errors')
 
+/**
+ * Creates an environment-configured OBS WebSocket service that serializes requested lifecycle transitions and schedules reconnects after connection-closed events while running.
+ *
+ * @param {object} [options] Client and timer dependencies, primarily for runtime integration and testing.
+ * @param {object} [options.obsClient] OBS WebSocket-compatible client.
+ * @returns {object} Connection lifecycle, OBS request, scene, source, input, and discovery operations.
+ */
 function createObsService({
   clearTimer = clearTimeout,
   logger = console,
@@ -146,6 +153,12 @@ function createObsService({
     return data.currentProgramSceneName
   }
 
+  /**
+   * Retrieves scenes, their sources, and available inputs for control-surface selection.
+   *
+   * @returns {Promise<object>} Current scene plus scene sources, inputs, and media-capable inputs; a failed scene-item request is returned on that scene with an empty source list.
+   * @throws {Error} Rejects when the required top-level OBS list requests fail.
+   */
   async function getDiscovery() {
     const [
       sceneData,
@@ -262,6 +275,13 @@ function createObsService({
   }
 }
 
+/**
+ * Maps a user-facing media command to its OBS WebSocket action constant.
+ *
+ * @param {string} action One of `play`, `pause`, `restart`, or `stop`, case-insensitively.
+ * @returns {string} OBS WebSocket media-input action constant.
+ * @throws {Error} Throws a client input error for unsupported actions.
+ */
 function normalizeMediaAction(action) {
   const normalized = String(action).trim().toLowerCase()
   const actions = {
@@ -275,6 +295,13 @@ function normalizeMediaAction(action) {
   throw userInputError('obs.media requires one of: play, pause, restart, stop')
 }
 
+/**
+ * Normalizes an OBS reconnect interval, using the default for sub-second or non-numeric values.
+ *
+ * @param {*} value Value to coerce to milliseconds.
+ * @param {number} [defaultValue=5000] Interval returned for invalid input.
+ * @returns {number} Rounded reconnect interval in milliseconds.
+ */
 function normalizeReconnectMs(value, defaultValue = 5000) {
   const interval = Number(value)
   return Number.isFinite(interval) && interval >= 1000 ? Math.round(interval) : defaultValue

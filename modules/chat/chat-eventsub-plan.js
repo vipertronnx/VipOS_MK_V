@@ -10,6 +10,12 @@ const EVENT_SUB_HANDLER_GROUPS = Object.freeze({
   subscriptions: 'subscriptions'
 })
 
+/**
+ * Derives the EventSub subscription categories required by a normalized command configuration snapshot.
+ *
+ * @param {object} [snapshot] Handler arrays grouped by event type.
+ * @returns {Set<string>} Human-readable EventSub groups that have at least one applicable handler.
+ */
 function getConfiguredEventSubHandlerGroupsFromSnapshot({
   automaticRedemptionHandlers = [],
   followHandlers = [],
@@ -36,6 +42,12 @@ function hasRewardEventHandler(handlers, eventName) {
   return handlers.some(handler => !handler.events.length || handler.events.includes(eventName))
 }
 
+/**
+ * Derives EventSub subscription categories from handler counts.
+ *
+ * @param {object} [counts] Number of configured handlers for each supported EventSub category.
+ * @returns {Set<string>} Human-readable groups with a non-zero handler count.
+ */
 function getConfiguredEventSubHandlerGroups({
   automaticRedemptionHandlerCount = 0,
   followHandlerCount = 0,
@@ -60,10 +72,23 @@ function getConfiguredEventSubHandlerGroups({
   ].filter(Boolean))
 }
 
+/**
+ * Finds configured EventSub groups absent from the current listener subscriptions.
+ *
+ * @param {Set<string>} configuredGroups Required subscription groups.
+ * @param {Set<string>} subscribedGroups Groups already registered on the listener.
+ * @returns {string[]} Required groups that remain unsubscribed.
+ */
 function getUnsubscribedEventSubHandlerGroups(configuredGroups, subscribedGroups) {
   return [...configuredGroups].filter(group => !subscribedGroups.has(group))
 }
 
+/**
+ * Determines whether the configured EventSub handlers require broadcaster credentials and specific scopes.
+ *
+ * @param {object} [options] EventSub configuration and normalized handler arrays.
+ * @returns {{needsBroadcasterToken: boolean, needsFollowScopes: boolean, needsSubscriptionScopes: boolean}} Required auth capabilities.
+ */
 function getEventSubAuthRequirements({
   config = {},
   followHandlers = [],

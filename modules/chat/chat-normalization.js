@@ -3,6 +3,13 @@ const { normalizeRegex } = require('./chat-regex')
 const { normalizeRole } = require('./chat-context')
 const { asArray } = require('../utils/value-normalization')
 
+/**
+ * Normalizes supported command-configuration layouts into complete event-handler collections.
+ *
+ * @param {object|Array<object>} parsed Parsed commands JSON; an array is treated as the command list.
+ * @returns {object} Configuration with every supported collection present as an array.
+ * @throws {Error} Throws when the root value is neither an object nor an array.
+ */
 function normalizeAutomationConfig(parsed) {
   if (Array.isArray(parsed)) {
     return {
@@ -35,6 +42,13 @@ function normalizeAutomationConfig(parsed) {
   }
 }
 
+/**
+ * Normalizes an enabled command and its aliases for case-insensitive lookup.
+ *
+ * @param {object} command Raw command definition with actions and one or more names.
+ * @param {string} commandPrefix Prefix added to names that do not already include it.
+ * @returns {object|null} Normalized command, or `null` when disabled or incomplete.
+ */
 function normalizeCommand(command, commandPrefix) {
   if (!command || typeof command !== 'object' || command.enabled === false) return null
 
@@ -56,6 +70,13 @@ function normalizeCommand(command, commandPrefix) {
   }
 }
 
+/**
+ * Normalizes a configured event handler into matchable filters and a stable cooldown key.
+ *
+ * @param {object} handler Raw handler definition containing actions and optional match constraints.
+ * @param {string|string[]} [defaultEvent] Event name or names used when the handler specifies none.
+ * @returns {object|null} Normalized handler, or `null` when disabled or missing actions.
+ */
 function normalizeActionHandler(handler, defaultEvent) {
   if (!handler || typeof handler !== 'object' || handler.enabled === false) return null
   if (!handler.actions) return null
@@ -126,6 +147,12 @@ function normalizeMatchList(value) {
   return asArray(value).map(normalizeMatchValue).filter(Boolean)
 }
 
+/**
+ * Converts a match value to trimmed lower-case text for case-insensitive comparisons.
+ *
+ * @param {*} value Value to normalize.
+ * @returns {string} Normalized text, or an empty string for a falsy value.
+ */
 function normalizeMatchValue(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -138,6 +165,12 @@ function normalizeEventList(value) {
   return asArray(value).map(normalizeEventName).filter(Boolean)
 }
 
+/**
+ * Converts event aliases and underscore notation to the canonical EventSub-style event name.
+ *
+ * @param {*} value Event name or supported shorthand.
+ * @returns {string} Canonical or normalized event name.
+ */
 function normalizeEventName(value) {
   const normalized = normalizeMatchValue(value).replace(/_/g, '.')
   const aliases = {

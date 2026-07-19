@@ -37,6 +37,13 @@ const VENOM_COIN_LOWER_THIRD_SLIDE_DURATION = cssTimeOrDefault(process.env.VENOM
 const TV_GUIDE_ITEMS_DEFAULT = process.env.TV_GUIDE_ITEMS_DEFAULT || 'config/examples/tv-guide.example.json'
 const TV_GUIDE_ITEMS = readTvGuideItems()
 
+/**
+ * Creates the Socket.IO server with origins restricted to the current local HTTP port.
+ *
+ * @param {import('http').Server} server HTTP server to upgrade for Socket.IO traffic.
+ * @param {object} [options] Port context used by CORS and upgrade validation.
+ * @returns {import('socket.io').Server} Configured Socket.IO server.
+ */
 function createSocketServer(server, { port = PORT, portContext = createPortContext(port) } = {}) {
   return new Server(server, {
     allowRequest(req, callback) {
@@ -53,6 +60,13 @@ function createSocketServer(server, { port = PORT, portContext = createPortConte
   })
 }
 
+/**
+ * Wires the application services around a shared Socket.IO instance.
+ *
+ * @param {object} dependencies Runtime dependencies.
+ * @param {import('socket.io').Server} dependencies.io Socket.IO server for overlay events.
+ * @returns {object} Initialized action, chat, OBS, raffle, and control services.
+ */
 function createRuntimeServices({ io }) {
   const quietMode = createQuietMode()
   const lowerThirdSync = createLowerThirdSync(io, LOWER_THIRD_TOGGLE_INTERVAL_MS)
@@ -101,6 +115,16 @@ function createRuntimeServices({ io }) {
   }
 }
 
+/**
+ * Initiates OBS connection, then waits for chat startup before recovering timers for a chat-disabled raffle.
+ * The OBS connection continues independently because its promise is not awaited here.
+ *
+ * @param {object} services Runtime services to start.
+ * @param {object} [options] Startup coordination options.
+ * @param {Function} [options.shouldContinue] Guard checked between asynchronous startup stages.
+ * @returns {Promise<void>}
+ * @throws {Error} Rejects when chat startup or raffle timer recovery fails.
+ */
 async function startRuntimeServices({ chat, obs, raffle }, { shouldContinue = () => true } = {}) {
   if (!shouldContinue()) return
   obs.connect()
@@ -110,6 +134,13 @@ async function startRuntimeServices({ chat, obs, raffle }, { shouldContinue = ()
   if (!chat.getStatus().enabled) raffle.startTimers()
 }
 
+/**
+ * Stops runtime services and reports every cleanup failure together.
+ *
+ * @param {object} [services] Services exposing their respective cleanup operations.
+ * @returns {Promise<void>}
+ * @throws {AggregateError} Throws after attempting all cleanup operations when one or more fail.
+ */
 async function stopRuntimeServices({ chat, lowerThirdSync, obs, raffle } = {}) {
   const errors = []
   const cleanup = [
@@ -481,8 +512,10 @@ function cssTimeOrDefault(value, defaultValue) {
 
 
 /**
- * Tracks the port used by the HTTP, Socket.IO, CORS, and status surfaces.
+ * Tracks the active local port and validates same-port origins and referers for HTTP and Socket.IO requests.
  *
+ * @param {number} [port=PORT] Initial listening port, which can be replaced after ephemeral-port binding.
+ * @returns {object} Port getter/setter and origin/referer validation functions.
  */
 function createPortContext(port = PORT) {
   let currentPort = port
@@ -516,8 +549,10 @@ function createPortContext(port = PORT) {
 
 
 /**
- * Require local JSON mutation for API endpoints
+ * Creates Express middleware that rejects non-local origins and requires JSON bodies for state-changing API requests.
  *
+ * @param {object} portContext Local-origin validator for the active HTTP port.
+ * @returns {Function} Express middleware that responds with 403 or 415 for rejected mutations.
  */
 function requireLocalJsonMutation(portContext) {
   return (req, res, next) => {
@@ -542,6 +577,13 @@ function requireLocalJsonMutation(portContext) {
 }
 
 
+/**
+ * Creates the local Express control and overlay application using the supplied runtime services.
+ *
+ * @param {object} services Initialized application services.
+ * @param {object} [options] HTTP port context used to secure mutating API routes.
+ * @returns {import('express').Express} Configured Express application.
+ */
 function createApp(services, { port = PORT, portContext = createPortContext(port) } = {}) {
   const app = express()
   const {
@@ -957,6 +999,12 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
   return app
 }
 
+/**
+ * Routes ordinary HTTP requests to Express while leaving Socket.IO's request handler intact.
+ *
+ * @param {import('http').Server} server Shared HTTP server.
+ * @param {import('express').Express} app Express application handler.
+ */
 function attachAppRequestHandler(server, app) {
   server.on('request', (req, res) => {
     if (req.url && req.url.startsWith('/socket.io/')) return
@@ -965,8 +1013,11 @@ function attachAppRequestHandler(server, app) {
 }
 
 /**
- * Listen on port
+ * Begins listening on loopback and starts runtime services after the HTTP server is ready.
  *
+ * @param {object} [options] Port and service-factory overrides.
+ * @param {number} [options.port=PORT] Local port to bind; `0` selects an ephemeral port.
+ * @returns {{app: import('express').Express, server: import('http').Server, services: object, stop: Function}} Server resources and an idempotent shutdown function that waits for runtime cleanup.
  */
 function startServer({ port = PORT, createServices = createRuntimeServices } = {}) {
   const server = http.createServer()

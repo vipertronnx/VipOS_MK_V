@@ -2,6 +2,14 @@ const { normalizeRole } = require('./chat-context')
 const { normalizeMatchValue } = require('./chat-normalization')
 const { testRegex } = require('./chat-regex')
 
+/**
+ * Creates command and EventSub automation that enforces role restrictions and cooldowns before dispatching actions.
+ *
+ * @param {object} options Action dispatcher, optional queue, and runtime callbacks.
+ * @param {object} options.actions Action runner used when no queue is configured.
+ * @param {object|null} [options.actionQueue] Queue used to serialize Twitch-triggered actions.
+ * @returns {object} Command parsing and event-handler execution operations.
+ */
 function createChatAutomation({
   actions,
   actionQueue = null,
@@ -12,6 +20,13 @@ function createChatAutomation({
 } = {}) {
   const cooldowns = new Map()
 
+  /**
+   * Resolves the first whitespace-delimited token in a chat message against normalized command names.
+   *
+   * @param {string} message Raw chat message.
+   * @param {Map<string, object>} commandMap Command definitions keyed by lower-case command name.
+   * @returns {object|null} Parsed command and arguments, or `null` when no configured command matches.
+   */
   function findCommand(message, commandMap) {
     const trimmed = String(message || '').trim()
     if (!trimmed) return null
@@ -56,6 +71,14 @@ function createChatAutomation({
     await runTwitchActions(`Twitch Command ${commandName}`, command.actions, commandContext)
   }
 
+  /**
+   * Dispatches every matching configured handler that is not on cooldown.
+   * With an action queue, dispatch resolves when actions are enqueued rather than when they finish.
+   *
+   * @param {Array<object>} handlers Normalized handler definitions for the current event category.
+   * @param {object} context Event context used by filters and action placeholders.
+   * @returns {Promise<number>} Count of handlers accepted for execution.
+   */
   async function runConfiguredHandlers(handlers, context) {
     let matchedCount = 0
 
@@ -137,6 +160,13 @@ function isAllowedRole(allowedRoles, actualRoles) {
   return allowedRoles.some(role => role === 'everyone' || actual.has(role))
 }
 
+/**
+ * Tests a normalized automation handler against event, reward, user, role, input, and viewer constraints.
+ *
+ * @param {object} handler Normalized handler definition.
+ * @param {object} context Event context to evaluate.
+ * @returns {boolean} Whether every configured constraint matches.
+ */
 function matchesHandler(handler, context) {
   if (handler.events.length && !handler.events.includes(context.event)) return false
 

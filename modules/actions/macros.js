@@ -36,6 +36,13 @@ const FALLBACK_MACROS = [
   }
 ]
 
+/**
+ * Creates a read-only macro catalog service with example and built-in fallbacks.
+ *
+ * @param {object} [options] Macro source and logging dependency.
+ * @param {string} [options.macrosFile] JSON file containing macro definitions.
+ * @returns {object} Methods for listing macros and finding one by normalized identifier.
+ */
 function createMacroService({
   macrosFile = DEFAULT_MACROS_FILE,
   logger = console
@@ -55,6 +62,13 @@ function createMacroService({
   }
 }
 
+/**
+ * Loads valid macro definitions from a configured or example JSON source.
+ *
+ * @param {string} file Preferred macro file path.
+ * @param {object} [logger=console] Logger exposing `warn` when the selected source cannot be read or parsed.
+ * @returns {Array<object>} Normalized macros, or the built-in fallback macros when none are usable.
+ */
 function loadMacros(file, logger = console) {
   const source = resolveMacroSource(file)
   if (!source) return FALLBACK_MACROS
