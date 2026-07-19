@@ -50,7 +50,7 @@ const DEFAULT_RECONNECT_INITIAL_MS = 5000
 const DEFAULT_RECONNECT_MAX_MS = 60000
 let twurpleModules = null
 
-function createChatService({ actions, actionQueue = null, logger = console, onReady = null, raffle = null, twurpleLoader = loadTwurple } = {}) {
+function createChatService({ actions, actionQueue = null, commandConfigFileSystem, logger = console, onReady = null, raffle = null, twurpleLoader = loadTwurple } = {}) {
   if (!actions) throw new Error('Chat service requires an action runner')
 
   const config = readConfig()
@@ -149,6 +149,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   const commandConfig = createCommandConfigLifecycle({
     commandPrefix: config.commandPrefix,
     commandsFile: config.commandsFile,
+    fileSystem: commandConfigFileSystem,
     logger,
     onError(error) {
       state.commandsLastError = error.message

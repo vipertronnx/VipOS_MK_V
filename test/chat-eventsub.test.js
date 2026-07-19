@@ -430,6 +430,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
       let subscriptionCreateSuccessHandler = null
       let subscriptionGiftHandler = null
       let subscriptionHandler = null
+      let commandConfigWatchCallback = null
       const eventSubRegistrations = {}
       const eventSubRegistrationCounts = {}
       const logs = []
@@ -443,6 +444,18 @@ async function withChatAutomationHarness(automationConfig, fn, {
           }
         },
         actions: {},
+        commandConfigFileSystem: {
+          existsSync: fs.existsSync,
+          readFileSync: fs.readFileSync,
+          unwatchFile() {
+            commandConfigWatchCallback = null
+          },
+          watchFile(file, options, callback) {
+            assert.equal(file, commandsFile)
+            assert.deepEqual(options, { interval: 1000 })
+            commandConfigWatchCallback = callback
+          }
+        },
         logger: {
           error(message) {
             errors.push(message)
@@ -535,6 +548,10 @@ async function withChatAutomationHarness(automationConfig, fn, {
           eventSubRegistrations,
           logs,
           queued,
+          reloadCommands() {
+            assert.equal(typeof commandConfigWatchCallback, 'function')
+            commandConfigWatchCallback()
+          },
           emitRevoke(subscription) {
             assert.equal(typeof revokeHandler, 'function')
             revokeHandler(subscription)
@@ -748,12 +765,13 @@ test('chat command cooldowns apply globally or per user as configured', async ()
 test('chat command watcher applies reloaded command configuration', async () => {
   const actions = [{ type: 'overlay.alert', message: 'Reloaded' }]
 
-  await withChatCommandHarness([], async ({ chat, commandsFile, queued, sendMessage }) => {
+  await withChatCommandHarness([], async ({ chat, commandsFile, queued, reloadCommands, sendMessage }) => {
     fs.writeFileSync(commandsFile, JSON.stringify({
       commands: [{ actions, command: '!reloaded' }]
     }))
 
-    await waitFor(() => chat.getStatus().commandCount === 1, 3000)
+    reloadCommands()
+    await waitFor(() => chat.getStatus().commandCount === 1)
     sendMessage(createChatMessage({ message: '!reloaded' }))
     await waitFor(() => queued.length === 1)
 
