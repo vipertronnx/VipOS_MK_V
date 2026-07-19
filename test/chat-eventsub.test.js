@@ -86,7 +86,12 @@ function createTwurpleStub({
   onRewardRemove = () => {},
   onRewardUpdate = () => {},
   onSubscription = () => {},
-  onSubscriptionGift = () => {}
+  onSubscriptionGift = () => {},
+  onListenerRevoke = () => {},
+  onListenerSubscriptionCreateFailure = () => {},
+  onListenerSubscriptionCreateSuccess = () => {},
+  onUserSocketConnect = () => {},
+  onUserSocketDisconnect = () => {}
 }) {
   class ApiClient {
     constructor() {
@@ -141,11 +146,21 @@ function createTwurpleStub({
       onRewardRemove({ broadcasterId, handler })
       return { id: `channel.channel_points_custom_reward.remove.${broadcasterId}` }
     }
-    onRevoke() {}
-    onSubscriptionCreateFailure() {}
-    onSubscriptionCreateSuccess() {}
-    onUserSocketConnect() {}
-    onUserSocketDisconnect() {}
+    onRevoke(handler) {
+      onListenerRevoke({ handler })
+    }
+    onSubscriptionCreateFailure(handler) {
+      onListenerSubscriptionCreateFailure({ handler })
+    }
+    onSubscriptionCreateSuccess(handler) {
+      onListenerSubscriptionCreateSuccess({ handler })
+    }
+    onUserSocketConnect(handler) {
+      onUserSocketConnect({ handler })
+    }
+    onUserSocketDisconnect(handler) {
+      onUserSocketDisconnect({ handler })
+    }
     start() {
       this.isActive = true
     }
@@ -363,6 +378,7 @@ function createRewardEvent({
 async function withChatAutomationHarness(automationConfig, fn, {
   enqueueError = null,
   enableRedemptions = false,
+  reconnectMs = null,
   useBotRefreshAuth = false,
   useBroadcasterAuth = false
 } = {}) {
@@ -379,6 +395,8 @@ async function withChatAutomationHarness(automationConfig, fn, {
       CHAT_ENABLE_HIGHLIGHT_ALERTS: 'false',
       CHAT_ENABLE_REDEMPTIONS: String(enableRedemptions),
       CHAT_ENABLED: 'true',
+      CHAT_RECONNECT_INITIAL_MS: reconnectMs === null ? undefined : String(reconnectMs),
+      CHAT_RECONNECT_MAX_MS: reconnectMs === null ? undefined : String(reconnectMs),
       TWITCH_BOT_ACCESS_TOKEN: useRefreshingAuth ? 'test-bot-access-token' : 'test-access-token',
       TWITCH_BOT_REFRESH_TOKEN: useRefreshingAuth ? 'test-bot-refresh-token' : undefined,
       TWITCH_BOT_TOKEN: undefined,
@@ -405,9 +423,17 @@ async function withChatAutomationHarness(automationConfig, fn, {
       let rewardRemoveHandler = null
       let rewardUpdateHandler = null
       let refreshingAuthProvider = null
+      let revokeHandler = null
+      let socketConnectHandler = null
+      let socketDisconnectHandler = null
+      let subscriptionCreateFailureHandler = null
+      let subscriptionCreateSuccessHandler = null
       let subscriptionGiftHandler = null
       let subscriptionHandler = null
       const eventSubRegistrations = {}
+      const eventSubRegistrationCounts = {}
+      const logs = []
+      const warnings = []
       const chat = createChatService({
         actionQueue: {
           enqueue(item) {
@@ -421,8 +447,12 @@ async function withChatAutomationHarness(automationConfig, fn, {
           error(message) {
             errors.push(message)
           },
-          log() {},
-          warn() {}
+          log(message) {
+            logs.push(message)
+          },
+          warn(message) {
+            warnings.push(message)
+          }
         },
         twurpleLoader: async () => createTwurpleStub({
           async getTokenInfo() {
@@ -451,6 +481,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
           },
           onRedemptionAdd(registration) {
             eventSubRegistrations.redemptionAdd = registration
+            eventSubRegistrationCounts.redemptionAdd = (eventSubRegistrationCounts.redemptionAdd || 0) + 1
             redemptionAddHandler = registration.handler
           },
           onRedemptionUpdate(registration) {
@@ -472,6 +503,21 @@ async function withChatAutomationHarness(automationConfig, fn, {
           onRewardUpdate(registration) {
             eventSubRegistrations.rewardUpdate = registration
             rewardUpdateHandler = registration.handler
+          },
+          onListenerRevoke({ handler }) {
+            revokeHandler = handler
+          },
+          onListenerSubscriptionCreateFailure({ handler }) {
+            subscriptionCreateFailureHandler = handler
+          },
+          onListenerSubscriptionCreateSuccess({ handler }) {
+            subscriptionCreateSuccessHandler = handler
+          },
+          onUserSocketConnect({ handler }) {
+            socketConnectHandler = handler
+          },
+          onUserSocketDisconnect({ handler }) {
+            socketDisconnectHandler = handler
           }
         })
       })
@@ -483,7 +529,30 @@ async function withChatAutomationHarness(automationConfig, fn, {
           chat,
           broadcasterTokenFile,
           errors,
+          eventSubRegistrationCounts,
+          eventSubRegistrations,
+          logs,
           queued,
+          emitRevoke(subscription) {
+            assert.equal(typeof revokeHandler, 'function')
+            revokeHandler(subscription)
+          },
+          emitSocketConnect(userId) {
+            assert.equal(typeof socketConnectHandler, 'function')
+            socketConnectHandler(userId)
+          },
+          emitSocketDisconnect(userId, error) {
+            assert.equal(typeof socketDisconnectHandler, 'function')
+            socketDisconnectHandler(userId, error)
+          },
+          emitSubscriptionCreateFailure(subscription, error) {
+            assert.equal(typeof subscriptionCreateFailureHandler, 'function')
+            subscriptionCreateFailureHandler(subscription, error)
+          },
+          emitSubscriptionCreateSuccess(subscription) {
+            assert.equal(typeof subscriptionCreateSuccessHandler, 'function')
+            subscriptionCreateSuccessHandler(subscription)
+          },
           refreshToken(userId, token) {
             assert.equal(typeof refreshingAuthProvider?.refreshHandler, 'function')
             refreshingAuthProvider.refreshHandler(userId, token)
@@ -532,8 +601,8 @@ async function withChatAutomationHarness(automationConfig, fn, {
             assert.equal(typeof rewardUpdateHandler, 'function')
             rewardUpdateHandler(event)
           },
-          eventSubRegistrations,
-          tokenFile
+          tokenFile,
+          warnings
         })
       } finally {
         chat.stop()
@@ -1138,6 +1207,110 @@ test('EventSub callback failures preserve their error status and log contracts',
   }, {
     enableRedemptions: true,
     enqueueError: queueFailure
+  })
+})
+
+test('EventSub socket lifecycle distinguishes bot and broadcaster connections', async () => {
+  await withBroadcasterChatAutomationHarness({}, async ({
+    chat,
+    emitSocketConnect,
+    emitSocketDisconnect,
+    logs,
+    warnings
+  }) => {
+    emitSocketConnect('bot-123')
+    assert.equal(chat.getStatus().connected, true)
+    assert.ok(logs.includes('Twitch EventSub socket connected'))
+
+    emitSocketDisconnect('bot-123', new Error('bot socket closed'))
+    assert.equal(chat.getStatus().connected, false)
+    assert.equal(chat.getStatus().lastError, 'bot socket closed')
+
+    emitSocketDisconnect('channel-123', new Error('broadcaster socket closed'))
+    assert.equal(chat.getStatus().rewardsLastError, 'broadcaster socket closed')
+    assert.ok(warnings.includes('Twitch EventSub socket disconnected: bot socket closed'))
+    assert.ok(warnings.includes('Twitch reward EventSub socket disconnected: broadcaster socket closed'))
+  }, { enableRedemptions: true })
+})
+
+test('non-reward EventSub failures and revocations restart the chat listener', async () => {
+  const subscription = { id: 'channel.chat.message.channel-123' }
+
+  await withChatAutomationHarness({}, async ({ chat, emitSubscriptionCreateFailure, errors }) => {
+    emitSubscriptionCreateFailure(subscription, new Error('subscription failed'))
+
+    const status = chat.getStatus()
+    assert.equal(status.started, false)
+    assert.equal(status.lastError, 'subscription failed')
+    assert.equal(status.retryAttempt, 1)
+    assert.notEqual(status.nextRetryAt, null)
+    assert.deepEqual(errors, ['Twitch EventSub subscription failed (channel.chat.message.channel-123): subscription failed'])
+  }, { reconnectMs: 60000 })
+
+  await withChatAutomationHarness({}, async ({ chat, emitRevoke, warnings }) => {
+    emitRevoke(subscription)
+
+    const status = chat.getStatus()
+    assert.equal(status.started, false)
+    assert.equal(status.lastError, 'Subscription revoked: channel.chat.message.channel-123')
+    assert.equal(status.retryAttempt, 1)
+    assert.notEqual(status.nextRetryAt, null)
+    assert.ok(warnings.includes('Twitch EventSub subscription revoked: channel.chat.message.channel-123'))
+  }, { reconnectMs: 60000 })
+})
+
+test('reward EventSub failures retry only the affected subscription and reset on success', async () => {
+  const subscription = { id: 'channel.channel_points_custom_reward_redemption.add.channel-123' }
+
+  await withBroadcasterChatAutomationHarness({}, async ({
+    chat,
+    emitRevoke,
+    emitSubscriptionCreateFailure,
+    emitSubscriptionCreateSuccess,
+    errors,
+    eventSubRegistrationCounts,
+    warnings
+  }) => {
+    assert.equal(eventSubRegistrationCounts.redemptionAdd, 1)
+
+    emitSubscriptionCreateFailure(subscription, new Error('reward subscription failed'))
+
+    let status = chat.getStatus()
+    assert.equal(status.started, true)
+    assert.equal(status.rewardsLastError, 'reward subscription failed')
+    assert.equal(status.rewardsRetryAttempt, 1)
+    assert.notEqual(status.rewardsNextRetryAt, null)
+    assert.deepEqual(errors, [
+      'Twitch reward subscription failed (channel.channel_points_custom_reward_redemption.add.channel-123): reward subscription failed'
+    ])
+
+    await waitFor(() => eventSubRegistrationCounts.redemptionAdd === 2)
+    assert.equal(chat.getStatus().rewardsNextRetryAt, null)
+
+    emitSubscriptionCreateSuccess(subscription)
+    status = chat.getStatus()
+    assert.equal(status.rewardsLastError, null)
+    assert.equal(status.rewardsRetryAttempt, 0)
+    assert.equal(status.rewardsNextRetryAt, null)
+
+    emitRevoke(subscription)
+    status = chat.getStatus()
+    assert.equal(status.started, true)
+    assert.equal(status.rewardsLastError, 'Subscription revoked: channel.channel_points_custom_reward_redemption.add.channel-123')
+    assert.equal(status.rewardsRetryAttempt, 1)
+    assert.notEqual(status.rewardsNextRetryAt, null)
+    assert.ok(warnings.includes('Twitch reward subscription revoked: channel.channel_points_custom_reward_redemption.add.channel-123'))
+
+    await waitFor(() => eventSubRegistrationCounts.redemptionAdd === 3)
+    emitSubscriptionCreateSuccess(subscription)
+
+    status = chat.getStatus()
+    assert.equal(status.rewardsLastError, null)
+    assert.equal(status.rewardsRetryAttempt, 0)
+    assert.equal(status.rewardsNextRetryAt, null)
+  }, {
+    enableRedemptions: true,
+    reconnectMs: 1
   })
 })
 
