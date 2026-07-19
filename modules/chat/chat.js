@@ -39,6 +39,7 @@ const {
   normalizeEventName,
   normalizeMatchValue
 } = require('./chat-normalization')
+const { createEventSubLifecycle } = require('./chat-eventsub')
 const { createRetryScheduler } = require('./chat-retry')
 
 const DEFAULT_COMMAND_PREFIX = '!'
@@ -62,17 +63,12 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   let commandWatcherStarted = false
   let commands = []
   let followHandlers = []
-  let listener = null
   let raidHandlers = []
   let redemptionHandlers = []
   let redemptionUpdateHandlers = []
   let rewardEventHandlers = []
   let subscriptionHandlers = []
-  let subscribedEventSubHandlerGroups = new Set()
-  let rewardSubscriptionRegistrars = new Map()
-  let rewardSubscriptionRetryQueue = new Map()
   let shouldRun = false
-  let started = false
   let starting = false
   const seenChatEntrants = new Set()
 
@@ -147,18 +143,17 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     }
   })
 
-  const rewardRetry = createRetryScheduler({
-    initialMs: config.reconnectInitialMs,
-    maxMs: config.reconnectMaxMs,
-    onSchedule({ attempt, delay }) {
-      state.rewardsRetryAttempt = attempt
-      state.rewardsNextRetryAt = new Date(Date.now() + delay).toISOString()
-      logger.warn(`Retrying Twitch reward subscription in ${Math.round(delay / 1000)}s`)
+  const eventSub = createEventSubLifecycle({
+    config,
+    isEnabled: () => state.enabled,
+    logger,
+    onRestart() {
+      cleanupListener()
+      scheduleRetry()
     },
-    onRetry: retryRewardSubscriptions,
-    onReset() {
-      state.rewardsRetryAttempt = 0
-      state.rewardsNextRetryAt = null
+    shouldRun: () => shouldRun,
+    updateState(nextState) {
+      Object.assign(state, nextState)
     }
   })
 
@@ -170,7 +165,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       return
     }
 
-    if (started || starting) return
+    if (state.started || starting) return
     starting = true
 
     try {
@@ -203,27 +198,20 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
       if (!shouldRun) return
 
-      listener = new twurple.EventSubWsListener({ apiClient: api })
-      bindListenerEvents(listener)
-      listener.onChannelChatMessage(
-        state.broadcasterId,
-        state.botUserId,
-        createEventHandler(handleMessage, 'lastError', 'chat message')
-      )
-      subscribedEventSubHandlerGroups = new Set([
-        ...bindRewardSubscriptions(listener),
-        ...bindCommunitySubscriptions(listener)
-      ])
       state.commandsRestartRequiredMessage = null
-
-      listener.start()
+      eventSub.start({
+        apiClient: api,
+        EventSubWsListener: twurple.EventSubWsListener,
+        botUserId: state.botUserId,
+        broadcasterAuthUserId: state.broadcasterAuthUserId,
+        registrations: getEventSubRegistrations()
+      })
       if (!shouldRun) {
         cleanupListener()
         return
       }
 
       watchCommands()
-      started = true
       state.started = true
       state.lastError = null
       startupRetry.reset()
@@ -249,14 +237,8 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   function cleanupListener() {
-    if (listener) listener.stop()
-    listener = null
-    started = false
+    eventSub.stop()
     state.started = false
-    state.connected = false
-    rewardRetry.reset()
-    rewardSubscriptionRegistrars = new Map()
-    rewardSubscriptionRetryQueue = new Map()
   }
 
   function scheduleRetry() {
@@ -310,161 +292,146 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     }
   }
 
-  function bindListenerEvents(eventSubListener) {
-    eventSubListener.onUserSocketConnect(userId => {
-      if (userId === state.botUserId) {
-        state.connected = true
-        logger.log('Twitch EventSub socket connected')
-      }
-    })
-
-    eventSubListener.onUserSocketDisconnect((userId, error) => {
-      if (userId === state.botUserId) {
-        state.connected = false
-        if (error) state.lastError = error.message
-        logger.warn(`Twitch EventSub socket disconnected${error ? `: ${error.message}` : ''}`)
-      } else if (userId === state.broadcasterAuthUserId) {
-        if (error) state.rewardsLastError = error.message
-        logger.warn(`Twitch reward EventSub socket disconnected${error ? `: ${error.message}` : ''}`)
-      }
-    })
-
-    eventSubListener.onSubscriptionCreateFailure((subscription, error) => {
-      if (isRewardSubscription(subscription)) {
-        state.rewardsLastError = error.message
-        logger.error(`Twitch reward subscription failed (${subscription.id}): ${error.message}`)
-        scheduleRewardSubscriptionRetry(subscription)
-        return
-      }
-
-      state.lastError = error.message
-      logger.error(`Twitch EventSub subscription failed (${subscription.id}): ${error.message}`)
-      cleanupListener()
-      scheduleRetry()
-    })
-
-    eventSubListener.onSubscriptionCreateSuccess(subscription => {
-      if (isRewardSubscription(subscription)) {
-        rewardSubscriptionRetryQueue.delete(subscription.id)
-        state.rewardsLastError = null
-        if (!rewardSubscriptionRetryQueue.size && !rewardRetry.isScheduled()) {
-          rewardRetry.reset()
-        }
-      }
-    })
-
-    eventSubListener.onRevoke(subscription => {
-      if (isRewardSubscription(subscription)) {
-        state.rewardsLastError = `Subscription revoked: ${subscription.id}`
-        logger.warn(`Twitch reward subscription revoked: ${subscription.id}`)
-        scheduleRewardSubscriptionRetry(subscription)
-        return
-      }
-
-      state.lastError = `Subscription revoked: ${subscription.id}`
-      logger.warn(`Twitch EventSub subscription revoked: ${subscription.id}`)
-      cleanupListener()
-      scheduleRetry()
-    })
+  function getEventSubRegistrations() {
+    return [
+      {
+        register: eventSubListener => eventSubListener.onChannelChatMessage(
+          state.broadcasterId,
+          state.botUserId,
+          createEventHandler(handleMessage, 'lastError', 'chat message')
+        )
+      },
+      ...getRewardSubscriptionRegistrations(),
+      ...getCommunitySubscriptionRegistrations()
+    ]
   }
 
-  function bindRewardSubscriptions(eventSubListener) {
-    const subscribedGroups = new Set()
+  function getRewardSubscriptionRegistrations() {
+    const registrations = []
 
-    if (!config.enableRedemptions) return subscribedGroups
+    if (!config.enableRedemptions) return registrations
     if (!state.broadcasterAuthUserId) {
       state.rewardsLastError = 'Broadcaster token is required for Twitch reward events'
       logger.warn(state.rewardsLastError)
-      return subscribedGroups
+      return registrations
     }
 
-    trackRewardSubscription(() => eventSubListener.onChannelRedemptionAdd(
-      state.broadcasterId,
-      createEventHandler(event => handleRedemption('redemption.add', event), 'rewardsLastError', 'redemption')
-    ))
-    subscribedGroups.add('redemptions')
+    registrations.push({
+      group: 'redemptions',
+      reward: true,
+      register: eventSubListener => eventSubListener.onChannelRedemptionAdd(
+        state.broadcasterId,
+        createEventHandler(event => handleRedemption('redemption.add', event), 'rewardsLastError', 'redemption')
+      )
+    })
 
     if (redemptionUpdateHandlers.length) {
-      trackRewardSubscription(() => eventSubListener.onChannelRedemptionUpdate(
-        state.broadcasterId,
-        createEventHandler(event => handleRedemption('redemption.update', event), 'rewardsLastError', 'redemption update')
-      ))
-      subscribedGroups.add('redemption updates')
+      registrations.push({
+        group: 'redemption updates',
+        reward: true,
+        register: eventSubListener => eventSubListener.onChannelRedemptionUpdate(
+          state.broadcasterId,
+          createEventHandler(event => handleRedemption('redemption.update', event), 'rewardsLastError', 'redemption update')
+        )
+      })
     }
 
     if (automaticRedemptionHandlers.length) {
-      trackRewardSubscription(() => eventSubListener.onChannelAutomaticRewardRedemptionAddV2(
-        state.broadcasterId,
-        createEventHandler(handleAutomaticRedemption, 'rewardsLastError', 'automatic redemption')
-      ))
-      subscribedGroups.add('automatic redemptions')
+      registrations.push({
+        group: 'automatic redemptions',
+        reward: true,
+        register: eventSubListener => eventSubListener.onChannelAutomaticRewardRedemptionAddV2(
+          state.broadcasterId,
+          createEventHandler(handleAutomaticRedemption, 'rewardsLastError', 'automatic redemption')
+        )
+      })
     }
 
     if (shouldBindRewardEvent('reward.add')) {
-      trackRewardSubscription(() => eventSubListener.onChannelRewardAdd(
-        state.broadcasterId,
-        createEventHandler(event => handleRewardEvent('reward.add', event), 'rewardsLastError', 'reward add')
-      ))
-      subscribedGroups.add('reward add events')
+      registrations.push({
+        group: 'reward add events',
+        reward: true,
+        register: eventSubListener => eventSubListener.onChannelRewardAdd(
+          state.broadcasterId,
+          createEventHandler(event => handleRewardEvent('reward.add', event), 'rewardsLastError', 'reward add')
+        )
+      })
     }
 
     if (shouldBindRewardEvent('reward.update')) {
-      trackRewardSubscription(() => eventSubListener.onChannelRewardUpdate(
-        state.broadcasterId,
-        createEventHandler(event => handleRewardEvent('reward.update', event), 'rewardsLastError', 'reward update')
-      ))
-      subscribedGroups.add('reward update events')
+      registrations.push({
+        group: 'reward update events',
+        reward: true,
+        register: eventSubListener => eventSubListener.onChannelRewardUpdate(
+          state.broadcasterId,
+          createEventHandler(event => handleRewardEvent('reward.update', event), 'rewardsLastError', 'reward update')
+        )
+      })
     }
 
     if (shouldBindRewardEvent('reward.remove')) {
-      trackRewardSubscription(() => eventSubListener.onChannelRewardRemove(
-        state.broadcasterId,
-        createEventHandler(event => handleRewardEvent('reward.remove', event), 'rewardsLastError', 'reward remove')
-      ))
-      subscribedGroups.add('reward remove events')
+      registrations.push({
+        group: 'reward remove events',
+        reward: true,
+        register: eventSubListener => eventSubListener.onChannelRewardRemove(
+          state.broadcasterId,
+          createEventHandler(event => handleRewardEvent('reward.remove', event), 'rewardsLastError', 'reward remove')
+        )
+      })
     }
 
-    return subscribedGroups
+    return registrations
   }
 
-  function bindCommunitySubscriptions(eventSubListener) {
-    const subscribedGroups = new Set()
+  function getCommunitySubscriptionRegistrations() {
+    const registrations = []
 
     if (followHandlers.length) {
       if (!state.broadcasterAuthUserId) {
         state.lastError = 'Broadcaster token is required for Twitch follow events'
         logger.warn(state.lastError)
       } else {
-        eventSubListener.onChannelFollow(
-          state.broadcasterId,
-          state.broadcasterAuthUserId,
-          createEventHandler(handleFollow, 'lastError', 'follow')
-        )
-        subscribedGroups.add('follows')
+        registrations.push({
+          group: 'follows',
+          register: eventSubListener => eventSubListener.onChannelFollow(
+            state.broadcasterId,
+            state.broadcasterAuthUserId,
+            createEventHandler(handleFollow, 'lastError', 'follow')
+          )
+        })
       }
     }
 
     if (raidHandlers.length) {
-      eventSubListener.onChannelRaidTo(
-        state.broadcasterId,
-        createEventHandler(handleRaid, 'lastError', 'raid')
-      )
-      subscribedGroups.add('raids')
+      registrations.push({
+        group: 'raids',
+        register: eventSubListener => eventSubListener.onChannelRaidTo(
+          state.broadcasterId,
+          createEventHandler(handleRaid, 'lastError', 'raid')
+        )
+      })
     }
 
     if (subscriptionHandlers.length) {
-      eventSubListener.onChannelSubscription(
-        state.broadcasterId,
-        createEventHandler(handleSubscription, 'lastError', 'subscription')
+      registrations.push(
+        {
+          group: 'subscriptions',
+          register: eventSubListener => eventSubListener.onChannelSubscription(
+            state.broadcasterId,
+            createEventHandler(handleSubscription, 'lastError', 'subscription')
+          )
+        },
+        {
+          group: 'subscriptions',
+          register: eventSubListener => eventSubListener.onChannelSubscriptionGift(
+            state.broadcasterId,
+            createEventHandler(handleSubscriptionGift, 'lastError', 'subscription gift')
+          )
+        }
       )
-      eventSubListener.onChannelSubscriptionGift(
-        state.broadcasterId,
-        createEventHandler(handleSubscriptionGift, 'lastError', 'subscription gift')
-      )
-      subscribedGroups.add('subscriptions')
     }
 
-    return subscribedGroups
+    return registrations
   }
 
   function createEventHandler(handler, errorStateKey, label) {
@@ -484,39 +451,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
   function shouldBindRewardEvent(eventName) {
     return rewardEventHandlers.some(handler => !handler.events.length || handler.events.includes(eventName))
-  }
-
-  function trackRewardSubscription(register) {
-    const subscription = register()
-    rewardSubscriptionRegistrars.set(subscription.id, register)
-    return subscription
-  }
-
-  function scheduleRewardSubscriptionRetry(subscription) {
-    if (!state.enabled || !shouldRun || !listener || !listener.isActive) return
-
-    const register = rewardSubscriptionRegistrars.get(subscription.id)
-    if (!register) return
-
-    rewardSubscriptionRetryQueue.set(subscription.id, register)
-    rewardRetry.schedule()
-  }
-
-  function retryRewardSubscriptions() {
-    if (!shouldRun || !listener || !listener.isActive) return
-
-    const subscriptions = [...rewardSubscriptionRetryQueue.values()]
-    rewardSubscriptionRetryQueue.clear()
-    state.rewardsNextRetryAt = null
-
-    for (const register of subscriptions) {
-      try {
-        trackRewardSubscription(register)
-      } catch (error) {
-        state.rewardsLastError = error.message
-        logger.error(`Twitch reward subscription retry failed: ${error.message}`)
-      }
-    }
   }
 
   async function handleMessage(event) {
@@ -841,7 +775,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   function getStatus() {
     return {
       ...state,
-      listenerActive: Boolean(listener && listener.isActive)
+      listenerActive: eventSub.isActive()
     }
   }
 
@@ -863,7 +797,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   function updateCommandsRestartRequirement() {
-    if (!started || !listener) {
+    if (!state.started || !eventSub.isActive()) {
       state.commandsRestartRequiredMessage = null
       return
     }
@@ -883,7 +817,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   function getMissingEventSubHandlerGroups() {
     return getUnsubscribedEventSubHandlerGroups(
       getCurrentConfiguredEventSubHandlerGroups(),
-      subscribedEventSubHandlerGroups
+      eventSub.getSubscribedGroups()
     )
   }
 
@@ -948,10 +882,6 @@ function isHighlightMessage(context, config) {
   if (!config.enableHighlightAlerts) return false
   if (context.chat.messageType === 'channel_points_highlighted') return true
   return Boolean(config.highlightRewardId && context.chat.rewardId === config.highlightRewardId)
-}
-
-function isRewardSubscription(subscription) {
-  return String(subscription.id || '').startsWith('channel.channel_points_')
 }
 
 function matchesHandler(handler, context) {
