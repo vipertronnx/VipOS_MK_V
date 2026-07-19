@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const { getAudioDurationMs } = require('./audio-duration')
+const { getAudioDurationMs } = require('./utils/audio-duration')
 const { userInputError } = require('./utils/errors')
 const { createGreetingService } = require('./greetings')
 const { asArray } = require('./utils/value-normalization')
