@@ -1,4 +1,3 @@
-const fs = require('fs')
 const path = require('path')
 const {
   CHAT_SCOPES,
@@ -33,12 +32,10 @@ const {
   summarizeRewardEventContext
 } = require('./chat-context')
 const {
-  normalizeActionHandler,
-  normalizeAutomationConfig,
-  normalizeCommand,
   normalizeEventName,
   normalizeMatchValue
 } = require('./chat-normalization')
+const { createCommandConfigLifecycle } = require('./chat-command-config')
 const { createEventSubLifecycle } = require('./chat-eventsub')
 const { createRetryScheduler } = require('./chat-retry')
 
@@ -68,17 +65,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
   let api = null
   let authProvider = null
-  let automaticRedemptionHandlers = []
-  let chatEntryHandlers = []
-  let commandMap = new Map()
-  let commandWatcherStarted = false
-  let commands = []
-  let followHandlers = []
-  let raidHandlers = []
-  let redemptionHandlers = []
-  let redemptionUpdateHandlers = []
-  let rewardEventHandlers = []
-  let subscriptionHandlers = []
   let shouldRun = false
   let starting = false
   const seenChatEntrants = new Set()
@@ -168,6 +154,27 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     }
   })
 
+  const commandConfig = createCommandConfigLifecycle({
+    commandPrefix: config.commandPrefix,
+    commandsFile: config.commandsFile,
+    logger,
+    onError(error) {
+      state.commandsLastError = error.message
+      logger.error(`Failed to load Twitch commands from ${relativeAppPath(config.commandsFile)}: ${error.message}`)
+    },
+    onLoaded(snapshot) {
+      applyCommandConfig(snapshot, { loaded: true })
+    },
+    onMissing(snapshot) {
+      applyCommandConfig(snapshot)
+      logger.warn(`Twitch commands file not found: ${relativeAppPath(config.commandsFile)}`)
+    },
+    onReloadError(error) {
+      state.lastError = error.message
+      logger.error(`Failed to reload Twitch commands: ${error.message}`)
+    }
+  })
+
   async function start() {
     shouldRun = true
 
@@ -180,13 +187,14 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     starting = true
 
     try {
-      await loadCommands()
+      await commandConfig.load()
 
       const twurple = await twurpleLoader()
+      const currentCommandConfig = commandConfig.getSnapshot()
       const auth = await createAuthProvider(twurple, config, logger, getEventSubAuthRequirements({
         config,
-        followHandlers,
-        subscriptionHandlers
+        followHandlers: currentCommandConfig.followHandlers,
+        subscriptionHandlers: currentCommandConfig.subscriptionHandlers
       }))
       authProvider = auth.authProvider
       state.authMode = auth.mode
@@ -222,7 +230,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
         return
       }
 
-      watchCommands()
+      commandConfig.watch()
       state.started = true
       state.lastError = null
       startupRetry.reset()
@@ -244,7 +252,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     shouldRun = false
     startupRetry.reset()
     cleanupListener()
-    unwatchCommands()
+    commandConfig.unwatch()
   }
 
   function cleanupListener() {
@@ -319,6 +327,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
   function getRewardSubscriptionRegistrations() {
     const registrations = []
+    const { automaticRedemptionHandlers, redemptionUpdateHandlers } = commandConfig.getSnapshot()
 
     if (!config.enableRedemptions) return registrations
     if (!state.broadcasterAuthUserId) {
@@ -390,6 +399,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
   function getCommunitySubscriptionRegistrations() {
     const registrations = []
+    const { followHandlers, raidHandlers, subscriptionHandlers } = commandConfig.getSnapshot()
 
     if (followHandlers.length) {
       if (!state.broadcasterAuthUserId) {
@@ -455,7 +465,8 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   function shouldBindRewardEvent(eventName) {
-    return rewardEventHandlers.some(handler => !handler.events.length || handler.events.includes(eventName))
+    return commandConfig.getSnapshot().rewardEventHandlers
+      .some(handler => !handler.events.length || handler.events.includes(eventName))
   }
 
   async function handleMessage(event) {
@@ -469,7 +480,11 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       await runHighlightAlert(context)
     }
 
-    const chatEntryKey = getPrivilegedChatEntryKey(context, chatEntryHandlers, seenChatEntrants)
+    const chatEntryKey = getPrivilegedChatEntryKey(
+      context,
+      commandConfig.getSnapshot().chatEntryHandlers,
+      seenChatEntrants
+    )
     if (chatEntryKey) {
       seenChatEntrants.add(chatEntryKey)
       try {
@@ -493,17 +508,26 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     state.chatEntryCount += 1
     state.lastChatEntryAt = new Date().toISOString()
     state.lastChatEntry = summarizeChatEntryContext(context)
-    state.lastChatEntryMatchedHandlers = await runConfiguredHandlers(chatEntryHandlers, context)
+    state.lastChatEntryMatchedHandlers = await runConfiguredHandlers(
+      commandConfig.getSnapshot().chatEntryHandlers,
+      context
+    )
   }
 
   async function handleRedemption(eventName, event) {
     const context = createRedemptionContext(eventName, event)
-    const handlers = eventName === 'redemption.update' ? redemptionUpdateHandlers : redemptionHandlers
+    const currentCommandConfig = commandConfig.getSnapshot()
+    const handlers = eventName === 'redemption.update'
+      ? currentCommandConfig.redemptionUpdateHandlers
+      : currentCommandConfig.redemptionHandlers
     return handleRedemptionContext(context, handlers)
   }
 
   async function handleAutomaticRedemption(event) {
-    return handleRedemptionContext(createAutomaticRedemptionContext(event), automaticRedemptionHandlers)
+    return handleRedemptionContext(
+      createAutomaticRedemptionContext(event),
+      commandConfig.getSnapshot().automaticRedemptionHandlers
+    )
   }
 
   async function handleRedemptionContext(context, handlers) {
@@ -518,23 +542,26 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     state.rewardEventCount += 1
     state.lastRewardEventAt = new Date().toISOString()
     state.lastRewardEvent = summarizeRewardEventContext(context)
-    state.lastRewardEventMatchedHandlers = await runConfiguredHandlers(rewardEventHandlers, context)
+    state.lastRewardEventMatchedHandlers = await runConfiguredHandlers(
+      commandConfig.getSnapshot().rewardEventHandlers,
+      context
+    )
   }
 
   async function handleFollow(event) {
-    return handleCommunityEvent(createFollowContext(event), followHandlers)
+    return handleCommunityEvent(createFollowContext(event), commandConfig.getSnapshot().followHandlers)
   }
 
   async function handleRaid(event) {
-    return handleCommunityEvent(createRaidContext(event), raidHandlers)
+    return handleCommunityEvent(createRaidContext(event), commandConfig.getSnapshot().raidHandlers)
   }
 
   async function handleSubscription(event) {
-    return handleCommunityEvent(createSubscriptionContext(event), subscriptionHandlers)
+    return handleCommunityEvent(createSubscriptionContext(event), commandConfig.getSnapshot().subscriptionHandlers)
   }
 
   async function handleSubscriptionGift(event) {
-    return handleCommunityEvent(createSubscriptionGiftContext(event), subscriptionHandlers)
+    return handleCommunityEvent(createSubscriptionGiftContext(event), commandConfig.getSnapshot().subscriptionHandlers)
   }
 
   async function handleCommunityEvent(context, handlers) {
@@ -546,7 +573,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
   async function simulateEvent(type, event) {
     state.simulating = true
-    await loadCommands()
+    await commandConfig.load()
 
     const normalizedType = normalizeEventName(type)
     try {
@@ -649,7 +676,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     if (!match) return null
 
     const commandName = match[1].toLowerCase()
-    const command = commandMap.get(commandName)
+    const command = commandConfig.getSnapshot().commandMap.get(commandName)
     if (!command) return null
 
     const after = (match[2] || '').trim()
@@ -677,104 +704,26 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     return false
   }
 
-  async function loadCommands() {
-    if (!fs.existsSync(config.commandsFile)) {
-      commands = []
-      commandMap = new Map()
-      chatEntryHandlers = []
-      followHandlers = []
-      raidHandlers = []
-      subscriptionHandlers = []
-      redemptionHandlers = []
-      redemptionUpdateHandlers = []
-      automaticRedemptionHandlers = []
-      rewardEventHandlers = []
-      state.commandCount = 0
-      state.chatEntryHandlerCount = 0
-      state.communityEventHandlerCount = 0
-      state.followHandlerCount = 0
-      state.raidHandlerCount = 0
-      state.subscriptionHandlerCount = 0
-      state.redemptionHandlerCount = 0
-      state.redemptionUpdateHandlerCount = 0
-      state.automaticRedemptionHandlerCount = 0
-      state.rewardEventHandlerCount = 0
-      updateRewardDisabledWarning(0)
-      state.commandsLastError = null
-      updateCommandsRestartRequirement()
-      logger.warn(`Twitch commands file not found: ${relativeAppPath(config.commandsFile)}`)
-      return
-    }
+  function applyCommandConfig(snapshot, { loaded = false } = {}) {
+    state.commandCount = snapshot.commandMap.size
+    state.chatEntryHandlerCount = snapshot.chatEntryHandlers.length
+    state.followHandlerCount = snapshot.followHandlers.length
+    state.raidHandlerCount = snapshot.raidHandlers.length
+    state.subscriptionHandlerCount = snapshot.subscriptionHandlers.length
+    state.communityEventHandlerCount = state.chatEntryHandlerCount + state.followHandlerCount + state.raidHandlerCount + state.subscriptionHandlerCount
+    state.redemptionHandlerCount = snapshot.redemptionHandlers.length
+    state.redemptionUpdateHandlerCount = snapshot.redemptionUpdateHandlers.length
+    state.automaticRedemptionHandlerCount = snapshot.automaticRedemptionHandlers.length
+    state.rewardEventHandlerCount = snapshot.rewardEventHandlers.length
+    if (loaded) state.commandsLoadedAt = new Date().toISOString()
+    state.commandsLastError = null
 
-    try {
-      const parsed = JSON.parse(fs.readFileSync(config.commandsFile, 'utf8'))
-      const automationConfig = normalizeAutomationConfig(parsed)
-      const nextCommands = automationConfig.commands.map(command => normalizeCommand(command, config.commandPrefix)).filter(Boolean)
-      const nextCommandMap = new Map()
-      const nextChatEntryHandlers = automationConfig.chatEntries.map(handler => normalizeActionHandler(handler, 'chat.entry')).filter(Boolean)
-      const nextFollowHandlers = automationConfig.follows.map(handler => normalizeActionHandler(handler, 'follow.add')).filter(Boolean)
-      const nextRaidHandlers = automationConfig.raids.map(handler => normalizeActionHandler(handler, 'raid.add')).filter(Boolean)
-      const nextSubscriptionHandlers = automationConfig.subscriptions.map(handler => normalizeActionHandler(handler, ['subscription.add', 'subscription.gift'])).filter(Boolean)
-      const nextRedemptionHandlers = automationConfig.redemptions.map(handler => normalizeActionHandler(handler, 'redemption.add')).filter(Boolean)
-      const nextRedemptionUpdateHandlers = automationConfig.redemptionUpdates.map(handler => normalizeActionHandler(handler, 'redemption.update')).filter(Boolean)
-      const nextAutomaticRedemptionHandlers = automationConfig.automaticRedemptions.map(handler => normalizeActionHandler(handler, 'automatic-redemption.add')).filter(Boolean)
-      const nextRewardEventHandlers = automationConfig.rewardEvents.map(handler => normalizeActionHandler(handler)).filter(Boolean)
-
-      for (const command of nextCommands) {
-        for (const name of command.names) {
-          if (nextCommandMap.has(name)) logger.warn(`Duplicate Twitch command ignored: ${name}`)
-          else nextCommandMap.set(name, command)
-        }
-      }
-
-      commands = nextCommands
-      commandMap = nextCommandMap
-      chatEntryHandlers = nextChatEntryHandlers
-      followHandlers = nextFollowHandlers
-      raidHandlers = nextRaidHandlers
-      subscriptionHandlers = nextSubscriptionHandlers
-      redemptionHandlers = nextRedemptionHandlers
-      redemptionUpdateHandlers = nextRedemptionUpdateHandlers
-      automaticRedemptionHandlers = nextAutomaticRedemptionHandlers
-      rewardEventHandlers = nextRewardEventHandlers
-      state.commandCount = commandMap.size
-      state.chatEntryHandlerCount = chatEntryHandlers.length
-      state.followHandlerCount = followHandlers.length
-      state.raidHandlerCount = raidHandlers.length
-      state.subscriptionHandlerCount = subscriptionHandlers.length
-      state.communityEventHandlerCount = chatEntryHandlers.length + followHandlers.length + raidHandlers.length + subscriptionHandlers.length
-      state.redemptionHandlerCount = redemptionHandlers.length
-      state.redemptionUpdateHandlerCount = redemptionUpdateHandlers.length
-      state.automaticRedemptionHandlerCount = automaticRedemptionHandlers.length
-      state.rewardEventHandlerCount = rewardEventHandlers.length
-      state.commandsLoadedAt = new Date().toISOString()
-      state.commandsLastError = null
-      const rewardHandlerCount = state.redemptionHandlerCount + state.redemptionUpdateHandlerCount + state.automaticRedemptionHandlerCount + state.rewardEventHandlerCount
-      updateRewardDisabledWarning(rewardHandlerCount)
+    const rewardHandlerCount = state.redemptionHandlerCount + state.redemptionUpdateHandlerCount + state.automaticRedemptionHandlerCount + state.rewardEventHandlerCount
+    updateRewardDisabledWarning(rewardHandlerCount)
+    if (loaded) {
       logger.log(`Loaded ${state.commandCount} Twitch chat command${state.commandCount === 1 ? '' : 's'}, ${rewardHandlerCount} reward handler${rewardHandlerCount === 1 ? '' : 's'}, and ${state.communityEventHandlerCount} community event handler${state.communityEventHandlerCount === 1 ? '' : 's'}`)
-      updateCommandsRestartRequirement()
-    } catch (error) {
-      state.commandsLastError = error.message
-      logger.error(`Failed to load Twitch commands from ${relativeAppPath(config.commandsFile)}: ${error.message}`)
     }
-  }
-
-  function watchCommands() {
-    if (commandWatcherStarted) return
-
-    commandWatcherStarted = true
-    fs.watchFile(config.commandsFile, { interval: 1000 }, () => {
-      loadCommands().catch(error => {
-        state.lastError = error.message
-        logger.error(`Failed to reload Twitch commands: ${error.message}`)
-      })
-    })
-  }
-
-  function unwatchCommands() {
-    if (!commandWatcherStarted) return
-    fs.unwatchFile(config.commandsFile)
-    commandWatcherStarted = false
+    updateCommandsRestartRequirement()
   }
 
   function getStatus() {
@@ -827,16 +776,17 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   function getCurrentConfiguredEventSubHandlerGroups() {
+    const currentCommandConfig = commandConfig.getSnapshot()
     return getConfiguredEventSubHandlerGroups({
-      automaticRedemptionHandlerCount: automaticRedemptionHandlers.length,
-      followHandlerCount: followHandlers.length,
-      raidHandlerCount: raidHandlers.length,
-      redemptionHandlerCount: redemptionHandlers.length,
-      redemptionUpdateHandlerCount: redemptionUpdateHandlers.length,
+      automaticRedemptionHandlerCount: currentCommandConfig.automaticRedemptionHandlers.length,
+      followHandlerCount: currentCommandConfig.followHandlers.length,
+      raidHandlerCount: currentCommandConfig.raidHandlers.length,
+      redemptionHandlerCount: currentCommandConfig.redemptionHandlers.length,
+      redemptionUpdateHandlerCount: currentCommandConfig.redemptionUpdateHandlers.length,
       rewardAddEventHandlerCount: shouldBindRewardEvent('reward.add') ? 1 : 0,
       rewardRemoveEventHandlerCount: shouldBindRewardEvent('reward.remove') ? 1 : 0,
       rewardUpdateEventHandlerCount: shouldBindRewardEvent('reward.update') ? 1 : 0,
-      subscriptionHandlerCount: subscriptionHandlers.length
+      subscriptionHandlerCount: currentCommandConfig.subscriptionHandlers.length
     })
   }
 

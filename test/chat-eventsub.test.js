@@ -529,6 +529,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
         await fn({
           chat,
           broadcasterTokenFile,
+          commandsFile,
           errors,
           eventSubRegistrationCounts,
           eventSubRegistrations,
@@ -740,6 +741,23 @@ test('chat command cooldowns apply globally or per user as configured', async ()
       { name: 'Twitch Command !user', userId: 'viewer-1' },
       { name: 'Twitch Command !user', userId: 'viewer-2' }
     ])
+  })
+})
+
+test('chat command watcher applies reloaded command configuration', async () => {
+  const actions = [{ type: 'overlay.alert', message: 'Reloaded' }]
+
+  await withChatCommandHarness([], async ({ chat, commandsFile, queued, sendMessage }) => {
+    fs.writeFileSync(commandsFile, JSON.stringify({
+      commands: [{ actions, command: '!reloaded' }]
+    }))
+
+    await waitFor(() => chat.getStatus().commandCount === 1, 3000)
+    sendMessage(createChatMessage({ message: '!reloaded' }))
+    await waitFor(() => queued.length === 1)
+
+    assert.deepEqual(queued[0].actions, actions)
+    assert.equal(queued[0].name, 'Twitch Command !reloaded')
   })
 })
 
