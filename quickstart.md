@@ -1,6 +1,7 @@
 # Before you start:
 #### You'll want to get a few ducks in a row to make setup easier.
 
+&#129414; Install Node.js 18 or newer.<br>
 &#129414; Make sure you have 2FA enabled on your main [Twitch](https://twitch.tv) account, and log in.<br>
 &#129414; Log in to [Twitch Developer](https://dev.twitch.tv) and register your bot as an app.<br>
 - Set the OAuth Redirect URL to `http://localhost`<br>
