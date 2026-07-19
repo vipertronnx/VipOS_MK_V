@@ -1,5 +1,5 @@
-const { normalizeCompletionDelay } = require('./utils/completion-delay')
-const { userInputError } = require('./utils/errors')
+const { normalizeCompletionDelay } = require('../utils/completion-delay')
+const { userInputError } = require('../utils/errors')
 
 function createActionQueue({
   actions,

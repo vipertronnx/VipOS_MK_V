@@ -1,12 +1,12 @@
 const fs = require('fs')
 const path = require('path')
-const { userInputError } = require('./utils/errors')
-const { createPersistenceError, writeJsonFile } = require('./utils/json-file')
+const { userInputError } = require('../utils/errors')
+const { createPersistenceError, writeJsonFile } = require('../utils/json-file')
 
-const DEFAULT_GREETINGS_FILE = path.join(__dirname, '..', 'config', 'greetings.json')
-const DEFAULT_GREETINGS_EXAMPLE_FILE = path.join(__dirname, '..', 'config', 'greetings.example.json')
-const DEFAULT_SETTINGS_FILE = path.join(__dirname, '..', 'config', 'greetings-settings.json')
-const CONFIG_DIRECTORY = path.join(__dirname, '..', 'config')
+const DEFAULT_GREETINGS_FILE = path.join(__dirname, '..', '..', 'config', 'greetings.json')
+const DEFAULT_GREETINGS_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'greetings.example.json')
+const DEFAULT_SETTINGS_FILE = path.join(__dirname, '..', '..', 'config', 'greetings-settings.json')
+const CONFIG_DIRECTORY = path.join(__dirname, '..', '..', 'config')
 const FALLBACK_POOL = 'all'
 
 function createGreetingService({
@@ -173,7 +173,7 @@ function resolveConfigJsonPath(value, fallback) {
 }
 
 function relativePath(filePath) {
-  return path.relative(path.join(__dirname, '..'), filePath).replace(/\\/g, '/')
+  return path.relative(path.join(__dirname, '..', '..'), filePath).replace(/\\/g, '/')
 }
 
 module.exports = {

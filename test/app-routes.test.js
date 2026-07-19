@@ -11,8 +11,8 @@ const { attachAppRequestHandler, createApp, createSocketServer, startServer } = 
 if (localDefaultAlertSound !== undefined) process.env.DEFAULT_ALERT_SOUND = localDefaultAlertSound
 else delete process.env.DEFAULT_ALERT_SOUND
 
-const { createActionQueue } = require('../modules/action-queue')
-const { createActionRunner } = require('../modules/actions')
+const { createActionQueue } = require('../modules/actions/action-queue')
+const { createActionRunner } = require('../modules/actions/actions')
 
 function createFakeServices() {
   const enqueued = []

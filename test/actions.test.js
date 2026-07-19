@@ -4,7 +4,7 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { assertSoundFileExists, createActionRunner, listSoundFiles, validateActionStructure } = require('../modules/actions')
+const { assertSoundFileExists, createActionRunner, listSoundFiles, validateActionStructure } = require('../modules/actions/actions')
 
 function createNoopActionRunner() {
   return createActionRunner({

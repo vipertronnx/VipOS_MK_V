@@ -4,8 +4,8 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { createGreetingService } = require('../modules/greetings')
-const { createRaffleService } = require('../modules/raffle')
+const { createGreetingService } = require('../modules/chat/chat-greetings')
+const { createRaffleService } = require('../modules/chat/chat-raffles')
 
 function withTempDirectory(fn) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vipos-persistence-'))

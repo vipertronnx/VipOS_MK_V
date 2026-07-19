@@ -1,9 +1,9 @@
 const fs = require('fs')
 const path = require('path')
-const { createPersistenceError, writeJsonFile } = require('./utils/json-file')
-const { parseBool } = require('./utils/value-normalization')
+const { createPersistenceError, writeJsonFile } = require('../utils/json-file')
+const { parseBool } = require('../utils/value-normalization')
 
-const DEFAULT_STATE_FILE = path.join(__dirname, '..', 'config', 'raffle.json')
+const DEFAULT_STATE_FILE = path.join(__dirname, '..', '..', 'config', 'raffle.json')
 const DEFAULT_MIN_DELAY_MS = 5 * 60 * 1000
 const DEFAULT_MAX_DELAY_MS = 10 * 60 * 1000
 const DEFAULT_ENTRY_WINDOW_MS = 2 * 60 * 1000

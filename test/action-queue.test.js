@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { createActionQueue } = require('../modules/action-queue')
+const { createActionQueue } = require('../modules/actions/action-queue')
 
 function deferred() {
   let resolve

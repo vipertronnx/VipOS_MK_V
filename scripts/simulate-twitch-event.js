@@ -2,10 +2,10 @@ require('dotenv').config({ quiet: true })
 
 const fs = require('fs')
 const path = require('path')
-const { createActionQueue } = require('../modules/action-queue')
-const { createActionRunner } = require('../modules/actions')
+const { createActionQueue } = require('../modules/actions/action-queue')
+const { createActionRunner } = require('../modules/actions/actions')
 const { createChatService } = require('../modules/chat/chat')
-const { createGreetingService } = require('../modules/greetings')
+const { createGreetingService } = require('../modules/chat/chat-greetings')
 
 const EVENT_ALIASES = {
   follow: 'follow',

@@ -1,10 +1,10 @@
 const fs = require('fs')
 const path = require('path')
-const { normalizeCompletionDelay } = require('./utils/completion-delay')
-const { asArray } = require('./utils/value-normalization')
+const { normalizeCompletionDelay } = require('./completion-delay')
+const { asArray } = require('./value-normalization')
 
-const DEFAULT_MACROS_FILE = path.join(__dirname, '..', 'config', 'macros.json')
-const DEFAULT_MACROS_EXAMPLE_FILE = path.join(__dirname, '..', 'config', 'macros.example.json')
+const DEFAULT_MACROS_FILE = path.join(__dirname, '..', '..', 'config', 'macros.json')
+const DEFAULT_MACROS_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'macros.example.json')
 
 const FALLBACK_MACROS = [
   {

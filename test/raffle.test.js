@@ -4,9 +4,9 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { createActionQueue } = require('../modules/action-queue')
-const { createActionRunner } = require('../modules/actions')
-const { createRaffleService } = require('../modules/raffle')
+const { createActionQueue } = require('../modules/actions/action-queue')
+const { createActionRunner } = require('../modules/actions/actions')
+const { createRaffleService } = require('../modules/chat/chat-raffles')
 
 function createExpiredRaffleState(filePath) {
   const now = Date.now()
