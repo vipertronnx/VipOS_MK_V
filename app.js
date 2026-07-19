@@ -13,12 +13,12 @@ const path = require('path')
 const { assertSoundFileExists, createActionRunner, listSoundFiles, validateSoundSrc } = require('./modules/actions')
 const { createActionQueue } = require('./modules/action-queue')
 const { createChatService } = require('./modules/chat/chat')
-const { normalizeCompletionDelay } = require('./modules/completion-delay')
+const { normalizeCompletionDelay } = require('./modules/utils/completion-delay')
 const { createGreetingService } = require('./modules/greetings')
 const { createMacroService } = require('./modules/macros')
 const { createObsService } = require('./modules/obs')
 const { createRaffleService } = require('./modules/raffle')
-const { parseBool } = require('./modules/value-normalization')
+const { parseBool } = require('./modules/utils/value-normalization')
 
 const PORT = Number(process.env.PORT) || 5000
 const APP_NAME = process.env.APP_NAME || 'VipOS MK V'

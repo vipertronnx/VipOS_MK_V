@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { asArray, parseBool } = require('../modules/value-normalization')
+const { asArray, parseBool } = require('../modules/utils/value-normalization')
 
 test('parseBool preserves default, token, and false-value handling', () => {
   for (const value of [undefined, null, '']) {

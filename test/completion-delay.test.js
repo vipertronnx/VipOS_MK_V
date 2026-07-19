@@ -5,7 +5,7 @@ const path = require('node:path')
 const test = require('node:test')
 
 const { createActionQueue } = require('../modules/action-queue')
-const { normalizeCompletionDelay } = require('../modules/completion-delay')
+const { normalizeCompletionDelay } = require('../modules/utils/completion-delay')
 const { createMacroService } = require('../modules/macros')
 
 test('completion delays normalize invalid, fractional, and capped values', () => {

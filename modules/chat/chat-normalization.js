@@ -1,7 +1,7 @@
 // Pure chat automation configuration normalization.
 const { normalizeRegex } = require('./chat-regex')
 const { normalizeRole } = require('./chat-context')
-const { asArray } = require('../value-normalization')
+const { asArray } = require('../utils/value-normalization')
 
 function normalizeAutomationConfig(parsed) {
   if (Array.isArray(parsed)) {

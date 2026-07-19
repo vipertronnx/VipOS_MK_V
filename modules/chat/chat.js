@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
-const { writeJsonFile } = require('../json-file')
-const { parseBool } = require('../value-normalization')
+const { writeJsonFile } = require('../utils/json-file')
+const { parseBool } = require('../utils/value-normalization')
 const { testRegex } = require('./chat-regex')
 const {
   createAutomaticRedemptionContext,

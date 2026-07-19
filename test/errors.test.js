@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { userInputError } = require('../modules/errors')
+const { userInputError } = require('../modules/utils/errors')
 
 test('user input errors preserve their HTTP 400 contract', () => {
   const error = userInputError('Invalid input')

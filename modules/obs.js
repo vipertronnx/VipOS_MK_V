@@ -1,5 +1,5 @@
 const { default: OBSWebSocket } = require('obs-websocket-js')
-const { userInputError } = require('./errors')
+const { userInputError } = require('./utils/errors')
 
 function createObsService({ logger = console } = {}) {
   const obs = new OBSWebSocket()

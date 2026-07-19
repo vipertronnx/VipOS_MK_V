@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
-const { userInputError } = require('./errors')
-const { createPersistenceError, writeJsonFile } = require('./json-file')
+const { userInputError } = require('./utils/errors')
+const { createPersistenceError, writeJsonFile } = require('./utils/json-file')
 
 const DEFAULT_GREETINGS_FILE = path.join(__dirname, '..', 'config', 'greetings.json')
 const DEFAULT_GREETINGS_EXAMPLE_FILE = path.join(__dirname, '..', 'config', 'greetings.example.json')
