@@ -4,7 +4,7 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { createGreetingService } = require('../modules/chat/chat-greetings')
+const { createGreetingService } = require('../modules/actions/greetings')
 const { createRaffleService } = require('../modules/chat/chat-raffles')
 
 function withTempDirectory(fn) {

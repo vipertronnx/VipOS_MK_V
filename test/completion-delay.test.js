@@ -6,7 +6,7 @@ const test = require('node:test')
 
 const { createActionQueue } = require('../modules/actions/action-queue')
 const { normalizeCompletionDelay } = require('../modules/utils/completion-delay')
-const { createMacroService } = require('../modules/utils/macros')
+const { createMacroService } = require('../modules/actions/macros')
 
 test('completion delays normalize invalid, fractional, and capped values', () => {
   assert.equal(normalizeCompletionDelay(undefined), 0)

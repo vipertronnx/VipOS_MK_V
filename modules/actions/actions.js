@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { getAudioDurationMs } = require('../utils/audio-duration')
 const { userInputError } = require('../utils/errors')
-const { createGreetingService } = require('../chat/chat-greetings')
+const { createGreetingService } = require('./greetings')
 const { asArray } = require('../utils/value-normalization')
 
 const DEFAULT_SOUND_DIRECTORY = path.join(__dirname, '..', '..', 'public', 'assets', 'sounds')

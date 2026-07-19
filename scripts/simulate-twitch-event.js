@@ -5,7 +5,7 @@ const path = require('path')
 const { createActionQueue } = require('../modules/actions/action-queue')
 const { createActionRunner } = require('../modules/actions/actions')
 const { createChatService } = require('../modules/chat/chat')
-const { createGreetingService } = require('../modules/chat/chat-greetings')
+const { createGreetingService } = require('../modules/actions/greetings')
 
 const EVENT_ALIASES = {
   follow: 'follow',
