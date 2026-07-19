@@ -35,24 +35,19 @@ const {
 const { createChatAutomation } = require('./chat-automation')
 const { createCommandConfigLifecycle } = require('./chat-command-config')
 const { createEventSubLifecycle } = require('./chat-eventsub')
+const {
+  EVENT_SUB_HANDLER_GROUPS,
+  getConfiguredEventSubHandlerGroups,
+  getConfiguredEventSubHandlerGroupsFromSnapshot,
+  getEventSubAuthRequirements,
+  getUnsubscribedEventSubHandlerGroups
+} = require('./chat-eventsub-plan')
 const { createRetryScheduler } = require('./chat-retry')
 
 const DEFAULT_COMMAND_PREFIX = '!'
 const DEFAULT_COMMANDS_FILE = path.join(__dirname, '..', '..', 'config', 'commands.json')
 const DEFAULT_RECONNECT_INITIAL_MS = 5000
 const DEFAULT_RECONNECT_MAX_MS = 60000
-const EVENT_SUB_HANDLER_GROUPS = Object.freeze({
-  automaticRedemptions: 'automatic redemptions',
-  follows: 'follows',
-  raids: 'raids',
-  redemptions: 'redemptions',
-  redemptionUpdates: 'redemption updates',
-  rewardAddEvents: 'reward add events',
-  rewardRemoveEvents: 'reward remove events',
-  rewardUpdateEvents: 'reward update events',
-  subscriptions: 'subscriptions'
-})
-
 let twurpleModules = null
 
 function createChatService({ actions, actionQueue = null, logger = console, onReady = null, raffle = null, twurpleLoader = loadTwurple } = {}) {
@@ -320,6 +315,9 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   function getEventSubRegistrations() {
+    const commandConfigSnapshot = commandConfig.getSnapshot()
+    const configuredGroups = getConfiguredEventSubHandlerGroupsFromSnapshot(commandConfigSnapshot)
+
     return [
       {
         register: eventSubListener => eventSubListener.onChannelChatMessage(
@@ -328,14 +326,13 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
           createEventHandler(handleMessage, 'lastError', 'chat message')
         )
       },
-      ...getRewardSubscriptionRegistrations(),
-      ...getCommunitySubscriptionRegistrations()
+      ...getRewardSubscriptionRegistrations(configuredGroups),
+      ...getCommunitySubscriptionRegistrations(configuredGroups)
     ]
   }
 
-  function getRewardSubscriptionRegistrations() {
+  function getRewardSubscriptionRegistrations(configuredGroups) {
     const registrations = []
-    const { automaticRedemptionHandlers, redemptionUpdateHandlers } = commandConfig.getSnapshot()
 
     if (!config.enableRedemptions) return registrations
     if (!state.broadcasterAuthUserId) {
@@ -352,7 +349,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       )
     })
 
-    if (redemptionUpdateHandlers.length) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.redemptionUpdates)) {
       registrations.push({
         group: EVENT_SUB_HANDLER_GROUPS.redemptionUpdates,
         register: eventSubListener => eventSubListener.onChannelRedemptionUpdate(
@@ -362,7 +359,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       })
     }
 
-    if (automaticRedemptionHandlers.length) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.automaticRedemptions)) {
       registrations.push({
         group: EVENT_SUB_HANDLER_GROUPS.automaticRedemptions,
         register: eventSubListener => eventSubListener.onChannelAutomaticRewardRedemptionAddV2(
@@ -372,7 +369,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       })
     }
 
-    if (shouldBindRewardEvent('reward.add')) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.rewardAddEvents)) {
       registrations.push({
         group: EVENT_SUB_HANDLER_GROUPS.rewardAddEvents,
         register: eventSubListener => eventSubListener.onChannelRewardAdd(
@@ -382,7 +379,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       })
     }
 
-    if (shouldBindRewardEvent('reward.update')) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.rewardUpdateEvents)) {
       registrations.push({
         group: EVENT_SUB_HANDLER_GROUPS.rewardUpdateEvents,
         register: eventSubListener => eventSubListener.onChannelRewardUpdate(
@@ -392,7 +389,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       })
     }
 
-    if (shouldBindRewardEvent('reward.remove')) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.rewardRemoveEvents)) {
       registrations.push({
         group: EVENT_SUB_HANDLER_GROUPS.rewardRemoveEvents,
         register: eventSubListener => eventSubListener.onChannelRewardRemove(
@@ -405,11 +402,10 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     return registrations
   }
 
-  function getCommunitySubscriptionRegistrations() {
+  function getCommunitySubscriptionRegistrations(configuredGroups) {
     const registrations = []
-    const { followHandlers, raidHandlers, subscriptionHandlers } = commandConfig.getSnapshot()
 
-    if (followHandlers.length) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.follows)) {
       if (!state.broadcasterAuthUserId) {
         state.lastError = 'Broadcaster token is required for Twitch follow events'
         logger.warn(state.lastError)
@@ -425,7 +421,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       }
     }
 
-    if (raidHandlers.length) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.raids)) {
       registrations.push({
         group: EVENT_SUB_HANDLER_GROUPS.raids,
         register: eventSubListener => eventSubListener.onChannelRaidTo(
@@ -435,7 +431,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       })
     }
 
-    if (subscriptionHandlers.length) {
+    if (configuredGroups.has(EVENT_SUB_HANDLER_GROUPS.subscriptions)) {
       registrations.push(
         {
           group: EVENT_SUB_HANDLER_GROUPS.subscriptions,
@@ -470,11 +466,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   function reportEventHandlerError(errorStateKey, label, error) {
     state[errorStateKey] = error.message
     logger.error(`Twitch ${label} handler failed: ${error.message}`)
-  }
-
-  function shouldBindRewardEvent(eventName) {
-    return commandConfig.getSnapshot().rewardEventHandlers
-      .some(handler => !handler.events.length || handler.events.includes(eventName))
   }
 
   async function handleMessage(event) {
@@ -677,18 +668,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   function getCurrentConfiguredEventSubHandlerGroups() {
-    const currentCommandConfig = commandConfig.getSnapshot()
-    return getConfiguredEventSubHandlerGroups({
-      automaticRedemptionHandlerCount: currentCommandConfig.automaticRedemptionHandlers.length,
-      followHandlerCount: currentCommandConfig.followHandlers.length,
-      raidHandlerCount: currentCommandConfig.raidHandlers.length,
-      redemptionHandlerCount: currentCommandConfig.redemptionHandlers.length,
-      redemptionUpdateHandlerCount: currentCommandConfig.redemptionUpdateHandlers.length,
-      rewardAddEventHandlerCount: shouldBindRewardEvent('reward.add') ? 1 : 0,
-      rewardRemoveEventHandlerCount: shouldBindRewardEvent('reward.remove') ? 1 : 0,
-      rewardUpdateEventHandlerCount: shouldBindRewardEvent('reward.update') ? 1 : 0,
-      subscriptionHandlerCount: currentCommandConfig.subscriptionHandlers.length
-    })
+    return getConfiguredEventSubHandlerGroupsFromSnapshot(commandConfig.getSnapshot())
   }
 
   return {
@@ -731,46 +711,6 @@ function isHighlightMessage(context, config) {
   if (!config.enableHighlightAlerts) return false
   if (context.chat.messageType === 'channel_points_highlighted') return true
   return Boolean(config.highlightRewardId && context.chat.rewardId === config.highlightRewardId)
-}
-
-function getConfiguredEventSubHandlerGroups({
-  automaticRedemptionHandlerCount = 0,
-  followHandlerCount = 0,
-  raidHandlerCount = 0,
-  redemptionHandlerCount = 0,
-  redemptionUpdateHandlerCount = 0,
-  rewardAddEventHandlerCount = 0,
-  rewardRemoveEventHandlerCount = 0,
-  rewardUpdateEventHandlerCount = 0,
-  subscriptionHandlerCount = 0
-} = {}) {
-  return new Set([
-    followHandlerCount ? EVENT_SUB_HANDLER_GROUPS.follows : '',
-    raidHandlerCount ? EVENT_SUB_HANDLER_GROUPS.raids : '',
-    subscriptionHandlerCount ? EVENT_SUB_HANDLER_GROUPS.subscriptions : '',
-    redemptionHandlerCount ? EVENT_SUB_HANDLER_GROUPS.redemptions : '',
-    redemptionUpdateHandlerCount ? EVENT_SUB_HANDLER_GROUPS.redemptionUpdates : '',
-    automaticRedemptionHandlerCount ? EVENT_SUB_HANDLER_GROUPS.automaticRedemptions : '',
-    rewardAddEventHandlerCount ? EVENT_SUB_HANDLER_GROUPS.rewardAddEvents : '',
-    rewardUpdateEventHandlerCount ? EVENT_SUB_HANDLER_GROUPS.rewardUpdateEvents : '',
-    rewardRemoveEventHandlerCount ? EVENT_SUB_HANDLER_GROUPS.rewardRemoveEvents : ''
-  ].filter(Boolean))
-}
-
-function getUnsubscribedEventSubHandlerGroups(configuredGroups, subscribedGroups) {
-  return [...configuredGroups].filter(group => !subscribedGroups.has(group))
-}
-
-function getEventSubAuthRequirements({
-  config = {},
-  followHandlers = [],
-  subscriptionHandlers = []
-} = {}) {
-  return {
-    needsBroadcasterToken: Boolean(config.enableRedemptions) || followHandlers.length > 0 || subscriptionHandlers.length > 0,
-    needsFollowScopes: followHandlers.length > 0,
-    needsSubscriptionScopes: subscriptionHandlers.length > 0
-  }
 }
 
 function readConfig() {

@@ -1012,6 +1012,13 @@ test('broadcaster-authenticated follow and subscription callbacks queue matched 
   })
 })
 
+test('enabled rewards register redemption adds without configured handlers', async () => {
+  await withBroadcasterChatAutomationHarness({}, async ({ chat, eventSubRegistrations }) => {
+    assert.equal(eventSubRegistrations.redemptionAdd.broadcasterId, 'channel-123')
+    assert.equal(chat.getStatus().redemptionHandlerCount, 0)
+  }, { enableRedemptions: true })
+})
+
 test('broadcaster-authenticated reward callbacks queue matched handlers', async () => {
   const redemptionActions = [{ type: 'overlay.alert', message: 'Redemption' }]
   const updateActions = [{ type: 'overlay.alert', message: 'Redemption update' }]
