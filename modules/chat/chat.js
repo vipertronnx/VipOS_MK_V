@@ -172,12 +172,11 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
       listener = new twurple.EventSubWsListener({ apiClient: api })
       bindListenerEvents(listener)
-      listener.onChannelChatMessage(state.broadcasterId, state.botUserId, event => {
-        handleMessage(event).catch(error => {
-          state.lastError = error.message
-          logger.error(`Twitch chat message handler failed: ${error.message}`)
-        })
-      })
+      listener.onChannelChatMessage(
+        state.broadcasterId,
+        state.botUserId,
+        createEventHandler(handleMessage, 'lastError', 'chat message')
+      )
       subscribedEventSubHandlerGroups = new Set([
         ...bindRewardSubscriptions(listener),
         ...bindCommunitySubscriptions(listener)
@@ -375,61 +374,49 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       return subscribedGroups
     }
 
-    trackRewardSubscription(() => eventSubListener.onChannelRedemptionAdd(state.broadcasterId, event => {
-      handleRedemption('redemption.add', event).catch(error => {
-        state.rewardsLastError = error.message
-        logger.error(`Twitch redemption handler failed: ${error.message}`)
-      })
-    }))
+    trackRewardSubscription(() => eventSubListener.onChannelRedemptionAdd(
+      state.broadcasterId,
+      createEventHandler(event => handleRedemption('redemption.add', event), 'rewardsLastError', 'redemption')
+    ))
     subscribedGroups.add('redemptions')
 
     if (redemptionUpdateHandlers.length) {
-      trackRewardSubscription(() => eventSubListener.onChannelRedemptionUpdate(state.broadcasterId, event => {
-        handleRedemption('redemption.update', event).catch(error => {
-          state.rewardsLastError = error.message
-          logger.error(`Twitch redemption update handler failed: ${error.message}`)
-        })
-      }))
+      trackRewardSubscription(() => eventSubListener.onChannelRedemptionUpdate(
+        state.broadcasterId,
+        createEventHandler(event => handleRedemption('redemption.update', event), 'rewardsLastError', 'redemption update')
+      ))
       subscribedGroups.add('redemption updates')
     }
 
     if (automaticRedemptionHandlers.length) {
-      trackRewardSubscription(() => eventSubListener.onChannelAutomaticRewardRedemptionAddV2(state.broadcasterId, event => {
-        handleAutomaticRedemption(event).catch(error => {
-          state.rewardsLastError = error.message
-          logger.error(`Twitch automatic redemption handler failed: ${error.message}`)
-        })
-      }))
+      trackRewardSubscription(() => eventSubListener.onChannelAutomaticRewardRedemptionAddV2(
+        state.broadcasterId,
+        createEventHandler(handleAutomaticRedemption, 'rewardsLastError', 'automatic redemption')
+      ))
       subscribedGroups.add('automatic redemptions')
     }
 
     if (shouldBindRewardEvent('reward.add')) {
-      trackRewardSubscription(() => eventSubListener.onChannelRewardAdd(state.broadcasterId, event => {
-        handleRewardEvent('reward.add', event).catch(error => {
-          state.rewardsLastError = error.message
-          logger.error(`Twitch reward add handler failed: ${error.message}`)
-        })
-      }))
+      trackRewardSubscription(() => eventSubListener.onChannelRewardAdd(
+        state.broadcasterId,
+        createEventHandler(event => handleRewardEvent('reward.add', event), 'rewardsLastError', 'reward add')
+      ))
       subscribedGroups.add('reward add events')
     }
 
     if (shouldBindRewardEvent('reward.update')) {
-      trackRewardSubscription(() => eventSubListener.onChannelRewardUpdate(state.broadcasterId, event => {
-        handleRewardEvent('reward.update', event).catch(error => {
-          state.rewardsLastError = error.message
-          logger.error(`Twitch reward update handler failed: ${error.message}`)
-        })
-      }))
+      trackRewardSubscription(() => eventSubListener.onChannelRewardUpdate(
+        state.broadcasterId,
+        createEventHandler(event => handleRewardEvent('reward.update', event), 'rewardsLastError', 'reward update')
+      ))
       subscribedGroups.add('reward update events')
     }
 
     if (shouldBindRewardEvent('reward.remove')) {
-      trackRewardSubscription(() => eventSubListener.onChannelRewardRemove(state.broadcasterId, event => {
-        handleRewardEvent('reward.remove', event).catch(error => {
-          state.rewardsLastError = error.message
-          logger.error(`Twitch reward remove handler failed: ${error.message}`)
-        })
-      }))
+      trackRewardSubscription(() => eventSubListener.onChannelRewardRemove(
+        state.broadcasterId,
+        createEventHandler(event => handleRewardEvent('reward.remove', event), 'rewardsLastError', 'reward remove')
+      ))
       subscribedGroups.add('reward remove events')
     }
 
@@ -444,43 +431,51 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
         state.lastError = 'Broadcaster token is required for Twitch follow events'
         logger.warn(state.lastError)
       } else {
-        eventSubListener.onChannelFollow(state.broadcasterId, state.broadcasterAuthUserId, event => {
-          handleFollow(event).catch(error => {
-            state.lastError = error.message
-            logger.error(`Twitch follow handler failed: ${error.message}`)
-          })
-        })
+        eventSubListener.onChannelFollow(
+          state.broadcasterId,
+          state.broadcasterAuthUserId,
+          createEventHandler(handleFollow, 'lastError', 'follow')
+        )
         subscribedGroups.add('follows')
       }
     }
 
     if (raidHandlers.length) {
-      eventSubListener.onChannelRaidTo(state.broadcasterId, event => {
-        handleRaid(event).catch(error => {
-          state.lastError = error.message
-          logger.error(`Twitch raid handler failed: ${error.message}`)
-        })
-      })
+      eventSubListener.onChannelRaidTo(
+        state.broadcasterId,
+        createEventHandler(handleRaid, 'lastError', 'raid')
+      )
       subscribedGroups.add('raids')
     }
 
     if (subscriptionHandlers.length) {
-      eventSubListener.onChannelSubscription(state.broadcasterId, event => {
-        handleSubscription(event).catch(error => {
-          state.lastError = error.message
-          logger.error(`Twitch subscription handler failed: ${error.message}`)
-        })
-      })
-      eventSubListener.onChannelSubscriptionGift(state.broadcasterId, event => {
-        handleSubscriptionGift(event).catch(error => {
-          state.lastError = error.message
-          logger.error(`Twitch subscription gift handler failed: ${error.message}`)
-        })
-      })
+      eventSubListener.onChannelSubscription(
+        state.broadcasterId,
+        createEventHandler(handleSubscription, 'lastError', 'subscription')
+      )
+      eventSubListener.onChannelSubscriptionGift(
+        state.broadcasterId,
+        createEventHandler(handleSubscriptionGift, 'lastError', 'subscription gift')
+      )
       subscribedGroups.add('subscriptions')
     }
 
     return subscribedGroups
+  }
+
+  function createEventHandler(handler, errorStateKey, label) {
+    return event => {
+      try {
+        Promise.resolve(handler(event)).catch(error => reportEventHandlerError(errorStateKey, label, error))
+      } catch (error) {
+        reportEventHandlerError(errorStateKey, label, error)
+      }
+    }
+  }
+
+  function reportEventHandlerError(errorStateKey, label, error) {
+    state[errorStateKey] = error.message
+    logger.error(`Twitch ${label} handler failed: ${error.message}`)
   }
 
   function shouldBindRewardEvent(eventName) {
@@ -584,18 +579,18 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   async function handleRedemption(eventName, event) {
     const context = createRedemptionContext(eventName, event)
     const handlers = eventName === 'redemption.update' ? redemptionUpdateHandlers : redemptionHandlers
+    return handleRedemptionContext(context, handlers)
+  }
+
+  async function handleAutomaticRedemption(event) {
+    return handleRedemptionContext(createAutomaticRedemptionContext(event), automaticRedemptionHandlers)
+  }
+
+  async function handleRedemptionContext(context, handlers) {
     state.redemptionCount += 1
     state.lastRedemptionAt = new Date().toISOString()
     state.lastRedemption = summarizeRedemptionContext(context)
     state.lastRedemptionMatchedHandlers = await runConfiguredHandlers(handlers, context)
-  }
-
-  async function handleAutomaticRedemption(event) {
-    const context = createAutomaticRedemptionContext(event)
-    state.redemptionCount += 1
-    state.lastRedemptionAt = new Date().toISOString()
-    state.lastRedemption = summarizeRedemptionContext(context)
-    state.lastRedemptionMatchedHandlers = await runConfiguredHandlers(automaticRedemptionHandlers, context)
   }
 
   async function handleRewardEvent(eventName, event) {
@@ -607,35 +602,26 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   }
 
   async function handleFollow(event) {
-    const context = createFollowContext(event)
-    state.communityEventCount += 1
-    state.lastCommunityEventAt = new Date().toISOString()
-    state.lastCommunityEvent = summarizeCommunityEventContext(context)
-    state.lastCommunityEventMatchedHandlers = await runConfiguredHandlers(followHandlers, context)
+    return handleCommunityEvent(createFollowContext(event), followHandlers)
   }
 
   async function handleRaid(event) {
-    const context = createRaidContext(event)
-    state.communityEventCount += 1
-    state.lastCommunityEventAt = new Date().toISOString()
-    state.lastCommunityEvent = summarizeCommunityEventContext(context)
-    state.lastCommunityEventMatchedHandlers = await runConfiguredHandlers(raidHandlers, context)
+    return handleCommunityEvent(createRaidContext(event), raidHandlers)
   }
 
   async function handleSubscription(event) {
-    const context = createSubscriptionContext(event)
-    state.communityEventCount += 1
-    state.lastCommunityEventAt = new Date().toISOString()
-    state.lastCommunityEvent = summarizeCommunityEventContext(context)
-    state.lastCommunityEventMatchedHandlers = await runConfiguredHandlers(subscriptionHandlers, context)
+    return handleCommunityEvent(createSubscriptionContext(event), subscriptionHandlers)
   }
 
   async function handleSubscriptionGift(event) {
-    const context = createSubscriptionGiftContext(event)
+    return handleCommunityEvent(createSubscriptionGiftContext(event), subscriptionHandlers)
+  }
+
+  async function handleCommunityEvent(context, handlers) {
     state.communityEventCount += 1
     state.lastCommunityEventAt = new Date().toISOString()
     state.lastCommunityEvent = summarizeCommunityEventContext(context)
-    state.lastCommunityEventMatchedHandlers = await runConfiguredHandlers(subscriptionHandlers, context)
+    state.lastCommunityEventMatchedHandlers = await runConfiguredHandlers(handlers, context)
   }
 
   async function simulateEvent(type, event) {

@@ -355,6 +355,7 @@ function createRewardEvent({
 }
 
 async function withChatAutomationHarness(automationConfig, fn, {
+  enqueueError = null,
   enableRedemptions = false,
   useBroadcasterAuth = false
 } = {}) {
@@ -383,6 +384,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
       TWITCH_HIGHLIGHT_REWARD_ID: undefined,
       TWITCH_TOKEN_FILE: tokenFile
     }, async () => {
+      const errors = []
       const queued = []
       let automaticRedemptionHandler = null
       let chatMessageHandler = null
@@ -399,12 +401,19 @@ async function withChatAutomationHarness(automationConfig, fn, {
       const chat = createChatService({
         actionQueue: {
           enqueue(item) {
+            if (enqueueError) throw enqueueError
             queued.push(item)
             return { queued: true }
           }
         },
         actions: {},
-        logger: { error() {}, log() {}, warn() {} },
+        logger: {
+          error(message) {
+            errors.push(message)
+          },
+          log() {},
+          warn() {}
+        },
         twurpleLoader: async () => createTwurpleStub({
           async getTokenInfo() {
             return { scopes: [], userId: 'bot-123' }
@@ -459,6 +468,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
         assert.equal(typeof chatMessageHandler, 'function')
         await fn({
           chat,
+          errors,
           queued,
           sendMessage(event) {
             assert.equal(typeof chatMessageHandler, 'function')
@@ -1071,6 +1081,45 @@ test('broadcaster-authenticated reward callbacks queue matched handlers', async 
 
     assert.equal(queued.length, 6)
   }, { enableRedemptions: true })
+})
+
+test('EventSub callback failures preserve their error status and log contracts', async () => {
+  const queueFailure = new Error('queue failed')
+
+  await withBroadcasterChatAutomationHarness({
+    follows: [
+      {
+        actions: [{ type: 'overlay.alert', message: 'New follower' }],
+        name: 'new-follower'
+      }
+    ]
+  }, async ({ chat, errors, queued, sendFollow }) => {
+    sendFollow(createFollowEvent())
+
+    await waitFor(() => chat.getStatus().lastError === 'queue failed')
+
+    assert.deepEqual(errors, ['Twitch follow handler failed: queue failed'])
+    assert.deepEqual(queued, [])
+  }, { enqueueError: queueFailure })
+
+  await withBroadcasterChatAutomationHarness({
+    redemptions: [
+      {
+        actions: [{ type: 'overlay.alert', message: 'Redemption' }],
+        name: 'redemption'
+      }
+    ]
+  }, async ({ chat, errors, queued, sendRedemptionAdd }) => {
+    sendRedemptionAdd(createRedemptionEvent())
+
+    await waitFor(() => chat.getStatus().rewardsLastError === 'queue failed')
+
+    assert.deepEqual(errors, ['Twitch redemption handler failed: queue failed'])
+    assert.deepEqual(queued, [])
+  }, {
+    enableRedemptions: true,
+    enqueueError: queueFailure
+  })
 })
 
 test('configured EventSub handler groups match restart-warning group names', () => {
