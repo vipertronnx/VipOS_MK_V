@@ -71,7 +71,7 @@ async function waitFor(predicate, timeoutMs = 1000) {
   assert.fail('Timed out waiting for condition')
 }
 
-function createTwurpleStub({ getTokenInfo, onChatMessage = () => {} }) {
+function createTwurpleStub({ getTokenInfo, onChatMessage = () => {}, onRaid = () => {} }) {
   class ApiClient {
     constructor() {
       this.users = {
@@ -88,6 +88,9 @@ function createTwurpleStub({ getTokenInfo, onChatMessage = () => {} }) {
 
     onChannelChatMessage(broadcasterId, botUserId, handler) {
       onChatMessage({ broadcasterId, botUserId, handler })
+    }
+    onChannelRaidTo(broadcasterId, handler) {
+      onRaid({ broadcasterId, handler })
     }
     onRevoke() {}
     onSubscriptionCreateFailure() {}
@@ -135,11 +138,28 @@ function createChatMessage({
   }
 }
 
-async function withChatCommandHarness(commands, fn) {
+function createRaidEvent({
+  displayName = 'Raider',
+  userId = 'raider-1',
+  username = 'raider',
+  viewers = 1
+} = {}) {
+  return {
+    raidedBroadcasterDisplayName: 'Test Channel',
+    raidedBroadcasterId: 'channel-123',
+    raidedBroadcasterName: 'test-channel',
+    raidingBroadcasterDisplayName: displayName,
+    raidingBroadcasterId: userId,
+    raidingBroadcasterName: username,
+    viewers
+  }
+}
+
+async function withChatAutomationHarness(automationConfig, fn) {
   await withTempDirectory(async directory => {
     const commandsFile = path.join(directory, 'commands.json')
     const tokenFile = path.join(directory, 'missing-token.json')
-    fs.writeFileSync(commandsFile, JSON.stringify({ commands }))
+    fs.writeFileSync(commandsFile, JSON.stringify(automationConfig))
 
     await withEnv({
       CHAT_COMMANDS_FILE: commandsFile,
@@ -161,6 +181,7 @@ async function withChatCommandHarness(commands, fn) {
     }, async () => {
       const queued = []
       let chatMessageHandler = null
+      let raidHandler = null
       const chat = createChatService({
         actionQueue: {
           enqueue(item) {
@@ -176,6 +197,9 @@ async function withChatCommandHarness(commands, fn) {
           },
           onChatMessage({ handler }) {
             chatMessageHandler = handler
+          },
+          onRaid({ handler }) {
+            raidHandler = handler
           }
         })
       })
@@ -187,7 +211,12 @@ async function withChatCommandHarness(commands, fn) {
           chat,
           queued,
           sendMessage(event) {
+            assert.equal(typeof chatMessageHandler, 'function')
             chatMessageHandler(event)
+          },
+          sendRaid(event) {
+            assert.equal(typeof raidHandler, 'function')
+            raidHandler(event)
           }
         })
       } finally {
@@ -195,6 +224,10 @@ async function withChatCommandHarness(commands, fn) {
       }
     })
   })
+}
+
+async function withChatCommandHarness(commands, fn) {
+  return withChatAutomationHarness({ commands }, fn)
 }
 
 test('chat commands enqueue configured actions with alias and argument context', async () => {
@@ -313,6 +346,138 @@ test('chat command cooldowns apply globally or per user as configured', async ()
       { name: 'Twitch Command !global', userId: 'viewer-1' },
       { name: 'Twitch Command !user', userId: 'viewer-1' },
       { name: 'Twitch Command !user', userId: 'viewer-2' }
+    ])
+  })
+})
+
+test('privileged chat entries queue matching handlers once per viewer', async () => {
+  const actions = [{ type: 'overlay.alert', message: 'Welcome moderator' }]
+
+  await withChatAutomationHarness({
+    chatEntries: [
+      {
+        actions,
+        match: { roles: ['moderator'] },
+        name: 'privileged-entry'
+      }
+    ]
+  }, async ({ chat, queued, sendMessage }) => {
+    const event = createChatMessage({
+      badges: { moderator: '1' },
+      displayName: 'Moderator',
+      message: 'Hello',
+      userId: 'moderator-1',
+      username: 'moderator'
+    })
+
+    sendMessage(event)
+
+    await waitFor(() => (
+      queued.length === 1 &&
+      chat.getStatus().lastChatEntryMatchedHandlers === 1
+    ))
+
+    const [queueItem] = queued
+    assert.deepEqual(queueItem.actions, actions)
+    assert.equal(queueItem.name, 'Twitch chat.entry privileged-entry')
+    assert.equal(queueItem.source, 'chat-entry')
+    assert.deepEqual({
+      entry: queueItem.context.entry,
+      event: queueItem.context.event,
+      roles: queueItem.context.roles,
+      source: queueItem.context.source,
+      userId: queueItem.context.userId
+    }, {
+      entry: {
+        firstSeenAt: queueItem.context.entry.firstSeenAt,
+        role: 'moderator',
+        roles: ['moderator']
+      },
+      event: 'chat.entry',
+      roles: ['everyone', 'moderator'],
+      source: 'chat-entry',
+      userId: 'moderator-1'
+    })
+
+    sendMessage({ ...event, messageId: 'message-moderator-1-return', messageText: 'Back again' })
+    await waitFor(() => chat.getStatus().messageCount === 2)
+
+    assert.equal(queued.length, 1)
+    assert.equal(chat.getStatus().chatEntryCount, 1)
+  })
+})
+
+test('raid callbacks queue matching handlers and respect handler cooldowns', async () => {
+  const incomingRaidActions = [{ type: 'overlay.alert', message: 'Incoming raid' }]
+  const largeRaidActions = [{ type: 'overlay.alert', message: 'Large raid' }]
+
+  await withChatAutomationHarness({
+    raids: [
+      {
+        actions: incomingRaidActions,
+        name: 'incoming-raid'
+      },
+      {
+        actions: largeRaidActions,
+        cooldownScope: 'user',
+        cooldownSeconds: 60,
+        match: { minViewers: 25 },
+        name: 'large-raid'
+      }
+    ]
+  }, async ({ chat, queued, sendRaid }) => {
+    sendRaid(createRaidEvent({ userId: 'raider-1', viewers: 50 }))
+
+    await waitFor(() => (
+      queued.length === 2 &&
+      chat.getStatus().lastCommunityEventMatchedHandlers === 2
+    ))
+
+    assert.deepEqual(queued.map(item => ({
+      actions: item.actions,
+      name: item.name,
+      source: item.source
+    })), [
+      {
+        actions: incomingRaidActions,
+        name: 'Twitch raid.add incoming-raid',
+        source: 'raid'
+      },
+      {
+        actions: largeRaidActions,
+        name: 'Twitch raid.add large-raid',
+        source: 'raid'
+      }
+    ])
+    assert.deepEqual({
+      event: queued[0].context.event,
+      source: queued[0].context.source,
+      userId: queued[0].context.userId,
+      viewers: queued[0].context.viewers
+    }, {
+      event: 'raid.add',
+      source: 'raid',
+      userId: 'raider-1',
+      viewers: 50
+    })
+
+    sendRaid(createRaidEvent({ userId: 'raider-2', viewers: 5 }))
+    await waitFor(() => (
+      queued.length === 3 &&
+      chat.getStatus().lastCommunityEventMatchedHandlers === 1
+    ))
+
+    sendRaid(createRaidEvent({ userId: 'raider-1', viewers: 50 }))
+    await waitFor(() => (
+      queued.length === 4 &&
+      chat.getStatus().lastCommunityEventMatchedHandlers === 1
+    ))
+
+    assert.deepEqual(queued.map(item => item.name), [
+      'Twitch raid.add incoming-raid',
+      'Twitch raid.add large-raid',
+      'Twitch raid.add incoming-raid',
+      'Twitch raid.add incoming-raid'
     ])
   })
 })
