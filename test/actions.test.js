@@ -140,6 +140,180 @@ test('action structure validation rejects unknown types and missing required fie
   }
 })
 
+test('action definitions execute every supported action type', async () => {
+  await withTempSoundDirectory(async soundDirectory => {
+    const chatCalls = []
+    const emitted = []
+    const logs = []
+    const obsCalls = []
+    createTinyWav(path.join(soundDirectory, 'alert.wav'))
+
+    const actions = createActionRunner({
+      io: {
+        emit(event, payload) {
+          emitted.push({ event, payload })
+        }
+      },
+      logger: {
+        error() {},
+        log(message) {
+          logs.push(message)
+        },
+        warn() {}
+      },
+      obs: {
+        async mediaAction(input, mediaAction) {
+          obsCalls.push({ input, mediaAction, type: 'media' })
+        },
+        async setInputMute(input, muted) {
+          obsCalls.push({ input, muted, type: 'mute' })
+        },
+        async setSourceVisibility(scene, source, visible) {
+          obsCalls.push({ scene, source, type: 'source', visible })
+        },
+        async switchScene(scene) {
+          obsCalls.push({ scene, type: 'scene' })
+        }
+      },
+      soundDirectory,
+      soundTextFile: path.join(soundDirectory, 'missing-sfx-text.json')
+    })
+    actions.setChatService({
+      async say(message, options) {
+        chatCalls.push({ message, options })
+        return { id: 'chat-message-1', isSent: true }
+      }
+    })
+
+    const context = {}
+    const results = await actions.run([
+      { type: 'chat.say', message: 'Hello chat' },
+      { type: 'context.pickRandom', contextKey: 'greeting', items: ['Hello'] },
+      { type: 'delay' },
+      { action: 'log', message: '{greeting} log' },
+      { type: 'obs.media', input: 'Video', mediaAction: 'restart' },
+      { type: 'obs.mute', input: 'Music', muted: true },
+      { type: 'obs.scene', scene: 'Live' },
+      { type: 'obs.source', scene: 'Live', source: 'Camera', visible: true },
+      { type: 'overlay.alert', message: '{greeting} alert', sound: false },
+      { type: 'overlay.emit', event: 'custom-alert', payload: { greeting: '{greeting}' } },
+      { type: 'sound.pickRandom', contextKey: 'sfx', textMap: { 'alert.wav': 'Alert sound' } },
+      { type: 'sound.play', src: '{sfx.src}' }
+    ], context)
+
+    assert.deepEqual(results.map(result => result.type), [
+      'chat.say',
+      'context.pickRandom',
+      'delay',
+      'log',
+      'obs.media',
+      'obs.mute',
+      'obs.scene',
+      'obs.source',
+      'overlay.alert',
+      'overlay.emit',
+      'sound.pickRandom',
+      'sound.play'
+    ])
+    assert.deepEqual(chatCalls, [{
+      message: 'Hello chat',
+      options: { replyParentMessageId: undefined, simulated: undefined }
+    }])
+    assert.deepEqual(obsCalls, [
+      { input: 'Video', mediaAction: 'restart', type: 'media' },
+      { input: 'Music', muted: true, type: 'mute' },
+      { scene: 'Live', type: 'scene' },
+      { scene: 'Live', source: 'Camera', type: 'source', visible: true }
+    ])
+    assert.deepEqual(emitted, [
+      { event: 'bg-alert', payload: undefined },
+      { event: 'text-alert', payload: { message: 'Hello alert' } },
+      { event: 'custom-alert', payload: { greeting: 'Hello' } },
+      { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } }
+    ])
+    assert.deepEqual(logs, ['Hello log'])
+    assert.equal(context.greeting, 'Hello')
+    assert.deepEqual(context.sfx, {
+      filename: 'alert.wav',
+      name: 'alert',
+      src: 'alert.wav',
+      text: 'Alert sound'
+    })
+  })
+})
+
+test('quiet mode suppresses the action definitions marked as quietable', async () => {
+  const emitted = []
+  const logs = []
+  const actions = createActionRunner({
+    io: {
+      emit(event, payload) {
+        emitted.push({ event, payload })
+      }
+    },
+    logger: {
+      error() {},
+      log(message) {
+        logs.push(message)
+      },
+      warn() {}
+    },
+    obs: {},
+    quietMode: {
+      isEnabled() {
+        return true
+      }
+    }
+  })
+
+  const results = await actions.run([
+    { type: 'overlay.alert', message: 'Quiet alert' },
+    { type: 'overlay.emit', event: 'quiet-event' },
+    { type: 'sound.pickRandom' },
+    { type: 'sound.play', src: 'missing.wav' },
+    { type: 'log', message: 'Still logged' }
+  ], { source: 'chat' })
+
+  assert.deepEqual(results.slice(0, 4), [
+    { type: 'overlay.alert', suppressed: true, reason: 'quiet-mode' },
+    { type: 'overlay.emit', suppressed: true, reason: 'quiet-mode' },
+    { type: 'sound.pickRandom', suppressed: true, reason: 'quiet-mode' },
+    { type: 'sound.play', suppressed: true, reason: 'quiet-mode' }
+  ])
+  assert.deepEqual(results[4], { type: 'log', message: 'Still logged' })
+  assert.deepEqual(emitted, [])
+  assert.deepEqual(logs, ['Still logged'])
+})
+
+test('explicit sound action definitions suppress an alert default sound', async () => {
+  await withTempSoundDirectory(async soundDirectory => {
+    createTinyWav(path.join(soundDirectory, 'alert.wav'))
+    const emitted = []
+    const actions = createActionRunner({
+      defaultAlertSound: 'alert.wav',
+      io: {
+        emit(event, payload) {
+          emitted.push({ event, payload })
+        }
+      },
+      logger: { error() {}, log() {}, warn() {} },
+      obs: {},
+      soundDirectory
+    })
+
+    await actions.run([
+      { type: 'overlay.alert', message: 'Alert' },
+      { type: 'sound.play', src: 'alert.wav' }
+    ])
+
+    assert.deepEqual(emitted, [
+      { event: 'bg-alert', payload: undefined },
+      { event: 'text-alert', payload: { message: 'Alert' } },
+      { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } }
+    ])
+  })
+})
+
 test('delay actions cap positive waits at ten minutes', async () => {
   let waitedMs = null
   const actions = createActionRunner({

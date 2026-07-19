@@ -14,19 +14,19 @@ const SOUND_LIST_CACHE_TTL_MS = 5000
 const DEFAULT_LARGE_SOUND_WARNING_BYTES = 25 * 1024 * 1024
 const SOUND_FILE_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9 _.-]*\.(mp3|ogg|wav)$/i
 const SOUND_PATH_PATTERN = /^(?:[a-zA-Z0-9][a-zA-Z0-9 _.-]*\/)*[a-zA-Z0-9][a-zA-Z0-9 _.-]*\.(mp3|ogg|wav)$/i
-const ACTION_VALIDATION_RULES = {
-  'chat.say': [['message', 'text']],
-  'context.pickRandom': [['contextKey', 'key']],
-  delay: [],
-  log: [],
-  'obs.media': [['input', 'source'], ['mediaAction', 'media', 'command']],
-  'obs.mute': [['input', 'source']],
-  'obs.scene': [['scene']],
-  'obs.source': [['source', 'input']],
-  'overlay.alert': [['message']],
-  'overlay.emit': [['event']],
-  'sound.pickRandom': [],
-  'sound.play': [['src', 'path']]
+const ACTION_DEFINITIONS = {
+  'chat.say': { execute: executeChatSay, requiredFields: [['message', 'text']] },
+  'context.pickRandom': { execute: executeContextPickRandom, requiredFields: [['contextKey', 'key']] },
+  delay: { execute: executeDelay, requiredFields: [] },
+  log: { execute: executeLog, requiredFields: [] },
+  'obs.media': { execute: executeObsMedia, requiredFields: [['input', 'source'], ['mediaAction', 'media', 'command']] },
+  'obs.mute': { execute: executeObsMute, requiredFields: [['input', 'source']] },
+  'obs.scene': { execute: executeObsScene, requiredFields: [['scene']] },
+  'obs.source': { execute: executeObsSource, requiredFields: [['source', 'input']] },
+  'overlay.alert': { execute: executeOverlayAlert, quietable: true, requiredFields: [['message']] },
+  'overlay.emit': { execute: executeOverlayEmit, quietable: true, requiredFields: [['event']] },
+  'sound.pickRandom': { execute: executeSoundPickRandom, quietable: true, requiredFields: [], sound: true },
+  'sound.play': { execute: executeSoundPlay, quietable: true, requiredFields: [['src', 'path']], sound: true }
 }
 
 const soundListCache = new Map()
@@ -85,6 +85,19 @@ function createActionRunner({
   overlayEmit = (event, payload) => io.emit(event, payload)
 }) {
   let chatService = null
+  const runtime = {
+    defaultAlertSound,
+    getChatService: () => chatService,
+    greetings,
+    io,
+    largeSoundWarningBytes,
+    logger,
+    obs,
+    overlayEmit,
+    soundDirectory,
+    soundTextFile,
+    waitForDelay
+  }
 
   function setChatService(service) {
     chatService = service
@@ -114,163 +127,9 @@ function createActionRunner({
       return { type, suppressed: true, reason: 'quiet-mode' }
     }
 
-    switch (type) {
-      case 'delay': {
-        const ms = normalizeActionDelay(action.ms ?? action.duration ?? 0)
-        if (ms > 0) await waitForDelay(ms)
-        return { type, ms }
-      }
-
-      case 'log': {
-        const message = hydrate(action.message || '', context)
-        logger.log(message)
-        return { type, message }
-      }
-
-      case 'overlay.emit': {
-        const event = hydrate(action.event, context)
-        if (!event) throw new Error('overlay.emit requires an event')
-        const payload = hydrate(action.payload || {}, context)
-        overlayEmit(event, payload)
-        return { type, event, payload }
-      }
-
-      case 'overlay.alert': {
-        const message = hydrate(action.message, context)
-        if (!message) throw new Error('overlay.alert requires a message')
-        if (action.background !== false) io.emit('bg-alert')
-        io.emit('text-alert', { message })
-        const soundResult = maybePlayAlertSound(action, context, options)
-        return soundResult ? { type, message, sound: soundResult } : { type, message }
-      }
-
-      case 'sound.play': {
-        const src = validateSoundSrc(hydrate(action.src || action.path, context))
-        if (!src) {
-          throw userInputError('sound.play requires a local sound path ending in .mp3, .ogg, or .wav')
-        }
-        assertSoundFileExists(src, soundDirectory)
-        const volume = clamp(Number(action.volume ?? 1), 0, 1)
-        const durationMs = getSoundDurationMs(src, soundDirectory, logger, largeSoundWarningBytes)
-        io.emit('sound-play', { src, volume })
-        return { type, src, volume, durationMs }
-      }
-
-      case 'sound.pickRandom': {
-        const contextKey = hydrate(action.contextKey || action.key || 'sfx', context)
-        if (!isSafeContextPath(contextKey)) {
-          throw userInputError('sound.pickRandom requires a safe contextKey')
-        }
-
-        const configuredTextMap = loadSoundTextMap(soundTextFile, logger)
-        const inlineTextMap = normalizeSoundTextMap(action.textMap || action.messages || action.labels)
-        const textMap = {
-          ...configuredTextMap,
-          ...inlineTextMap
-        }
-        const pickedSound = pickRandomSound({
-          soundDirectory,
-          textMap,
-          eligibleFilenames: [...Object.keys(configuredTextMap), ...Object.keys(inlineTextMap)]
-        })
-        setPath(context, contextKey, pickedSound)
-
-        return { type, contextKey, ...pickedSound }
-      }
-
-      case 'context.pickRandom': {
-        const contextKey = hydrate(action.contextKey || action.key, context)
-        if (!isSafeContextPath(contextKey)) {
-          throw userInputError('context.pickRandom requires a safe contextKey')
-        }
-
-        const configuredItems = action.items || action.values || action.list
-        const picked = configuredItems
-          ? pickInlineItem(hydrate(asArray(configuredItems), context))
-          : greetings.pick({
-            file: hydrate(action.file || action.path, context),
-            pool: hydrate(action.pool || action.theme || action.category, context)
-          })
-        const value = picked.value
-        setPath(context, contextKey, value)
-
-        return { type, contextKey, ...picked }
-      }
-
-      case 'chat.say': {
-        if (!chatService) throw new Error('Twitch chat is not configured')
-        const message = hydrate(action.message || action.text, context)
-        if (!message) throw new Error('chat.say requires a message')
-
-        const explicitReplyId = hydrate(action.replyParentMessageId || action.replyTo, context)
-        const replyParentMessageId = explicitReplyId || (parseToggle(action.reply) === true ? context.messageId : undefined)
-        const sent = await chatService.say(message, { replyParentMessageId, simulated: context.simulated })
-        return { type, message, ...sent }
-      }
-
-      case 'obs.scene': {
-        const scene = hydrate(action.scene, context)
-        if (!scene) throw new Error('obs.scene requires a scene')
-        await obs.switchScene(scene)
-        return { type, scene }
-      }
-
-      case 'obs.source': {
-        const scene = hydrate(action.scene, context)
-        const source = hydrate(action.source || action.input, context)
-        if (!source) throw new Error('obs.source requires a source')
-        const visible = parseToggle(action.visible ?? action.status ?? true)
-        if (visible === 'toggle') {
-          const nextVisible = await obs.toggleSourceVisibility(scene, source)
-          return { type, scene, source, visible: nextVisible }
-        }
-
-        await obs.setSourceVisibility(scene, source, visible)
-        return { type, scene, source, visible }
-      }
-
-      case 'obs.mute': {
-        const input = hydrate(action.input || action.source, context)
-        if (!input) throw new Error('obs.mute requires an input')
-        const muted = parseToggle(action.muted ?? action.status ?? 'toggle')
-        if (muted === 'toggle') {
-          const nextMuted = await obs.toggleInputMute(input)
-          return { type, input, muted: nextMuted }
-        }
-
-        await obs.setInputMute(input, muted)
-        return { type, input, muted }
-      }
-
-      case 'obs.media': {
-        const input = hydrate(action.input || action.source, context)
-        const mediaAction = hydrate(action.mediaAction || action.media || action.command, context)
-        if (!input) throw new Error('obs.media requires an input')
-        if (!mediaAction) throw new Error('obs.media requires a mediaAction')
-        await obs.mediaAction(input, mediaAction)
-        return { type, input, mediaAction }
-      }
-
-      default:
-        throw new Error(`Unknown action type: ${type}`)
-    }
-  }
-
-  function maybePlayAlertSound(action, context, { hasExplicitSoundAction = false } = {}) {
-    if (action.sound === false || action.playSound === false) return null
-    if (hasExplicitSoundAction && action.sound === undefined && action.soundSrc === undefined && action.src === undefined) return null
-
-    const requestedSrc = action.sound === true
-      ? defaultAlertSound
-      : action.sound || action.soundSrc || action.src || defaultAlertSound
-    const src = validateSoundSrc(hydrate(requestedSrc, context))
-    if (!src) return null
-
-    assertSoundFileExists(src, soundDirectory)
-    const volume = clamp(Number(action.volume ?? 1), 0, 1)
-    const durationMs = getSoundDurationMs(src, soundDirectory, logger, largeSoundWarningBytes)
-    io.emit('sound-play', { src, volume })
-    return { type: 'sound.play', src, volume, durationMs, source: 'overlay.alert' }
+    const definition = getActionDefinition(type)
+    if (!definition) throw new Error(`Unknown action type: ${type}`)
+    return definition.execute(action, context, options, runtime)
   }
 
   return {
@@ -278,6 +137,160 @@ function createActionRunner({
     setChatService,
     validateStructure: validateActionStructure
   }
+}
+
+async function executeChatSay(action, context, options, runtime) {
+  const chatService = runtime.getChatService()
+  if (!chatService) throw new Error('Twitch chat is not configured')
+  const message = hydrate(action.message || action.text, context)
+  if (!message) throw new Error('chat.say requires a message')
+
+  const explicitReplyId = hydrate(action.replyParentMessageId || action.replyTo, context)
+  const replyParentMessageId = explicitReplyId || (parseToggle(action.reply) === true ? context.messageId : undefined)
+  const sent = await chatService.say(message, { replyParentMessageId, simulated: context.simulated })
+  return { type: 'chat.say', message, ...sent }
+}
+
+function executeContextPickRandom(action, context, options, runtime) {
+  const contextKey = hydrate(action.contextKey || action.key, context)
+  if (!isSafeContextPath(contextKey)) {
+    throw userInputError('context.pickRandom requires a safe contextKey')
+  }
+
+  const configuredItems = action.items || action.values || action.list
+  const picked = configuredItems
+    ? pickInlineItem(hydrate(asArray(configuredItems), context))
+    : runtime.greetings.pick({
+      file: hydrate(action.file || action.path, context),
+      pool: hydrate(action.pool || action.theme || action.category, context)
+    })
+  const value = picked.value
+  setPath(context, contextKey, value)
+
+  return { type: 'context.pickRandom', contextKey, ...picked }
+}
+
+async function executeDelay(action, context, options, runtime) {
+  const ms = normalizeActionDelay(action.ms ?? action.duration ?? 0)
+  if (ms > 0) await runtime.waitForDelay(ms)
+  return { type: 'delay', ms }
+}
+
+function executeLog(action, context, options, runtime) {
+  const message = hydrate(action.message || '', context)
+  runtime.logger.log(message)
+  return { type: 'log', message }
+}
+
+async function executeObsMedia(action, context, options, runtime) {
+  const input = hydrate(action.input || action.source, context)
+  const mediaAction = hydrate(action.mediaAction || action.media || action.command, context)
+  if (!input) throw new Error('obs.media requires an input')
+  if (!mediaAction) throw new Error('obs.media requires a mediaAction')
+  await runtime.obs.mediaAction(input, mediaAction)
+  return { type: 'obs.media', input, mediaAction }
+}
+
+async function executeObsMute(action, context, options, runtime) {
+  const input = hydrate(action.input || action.source, context)
+  if (!input) throw new Error('obs.mute requires an input')
+  const muted = parseToggle(action.muted ?? action.status ?? 'toggle')
+  if (muted === 'toggle') {
+    const nextMuted = await runtime.obs.toggleInputMute(input)
+    return { type: 'obs.mute', input, muted: nextMuted }
+  }
+
+  await runtime.obs.setInputMute(input, muted)
+  return { type: 'obs.mute', input, muted }
+}
+
+async function executeObsScene(action, context, options, runtime) {
+  const scene = hydrate(action.scene, context)
+  if (!scene) throw new Error('obs.scene requires a scene')
+  await runtime.obs.switchScene(scene)
+  return { type: 'obs.scene', scene }
+}
+
+async function executeObsSource(action, context, options, runtime) {
+  const scene = hydrate(action.scene, context)
+  const source = hydrate(action.source || action.input, context)
+  if (!source) throw new Error('obs.source requires a source')
+  const visible = parseToggle(action.visible ?? action.status ?? true)
+  if (visible === 'toggle') {
+    const nextVisible = await runtime.obs.toggleSourceVisibility(scene, source)
+    return { type: 'obs.source', scene, source, visible: nextVisible }
+  }
+
+  await runtime.obs.setSourceVisibility(scene, source, visible)
+  return { type: 'obs.source', scene, source, visible }
+}
+
+function executeOverlayAlert(action, context, options, runtime) {
+  const message = hydrate(action.message, context)
+  if (!message) throw new Error('overlay.alert requires a message')
+  if (action.background !== false) runtime.io.emit('bg-alert')
+  runtime.io.emit('text-alert', { message })
+  const soundResult = maybePlayAlertSound(action, context, options, runtime)
+  return soundResult ? { type: 'overlay.alert', message, sound: soundResult } : { type: 'overlay.alert', message }
+}
+
+function executeOverlayEmit(action, context, options, runtime) {
+  const event = hydrate(action.event, context)
+  if (!event) throw new Error('overlay.emit requires an event')
+  const payload = hydrate(action.payload || {}, context)
+  runtime.overlayEmit(event, payload)
+  return { type: 'overlay.emit', event, payload }
+}
+
+function executeSoundPickRandom(action, context, options, runtime) {
+  const contextKey = hydrate(action.contextKey || action.key || 'sfx', context)
+  if (!isSafeContextPath(contextKey)) {
+    throw userInputError('sound.pickRandom requires a safe contextKey')
+  }
+
+  const configuredTextMap = loadSoundTextMap(runtime.soundTextFile, runtime.logger)
+  const inlineTextMap = normalizeSoundTextMap(action.textMap || action.messages || action.labels)
+  const textMap = {
+    ...configuredTextMap,
+    ...inlineTextMap
+  }
+  const pickedSound = pickRandomSound({
+    soundDirectory: runtime.soundDirectory,
+    textMap,
+    eligibleFilenames: [...Object.keys(configuredTextMap), ...Object.keys(inlineTextMap)]
+  })
+  setPath(context, contextKey, pickedSound)
+
+  return { type: 'sound.pickRandom', contextKey, ...pickedSound }
+}
+
+function executeSoundPlay(action, context, options, runtime) {
+  const src = validateSoundSrc(hydrate(action.src || action.path, context))
+  if (!src) {
+    throw userInputError('sound.play requires a local sound path ending in .mp3, .ogg, or .wav')
+  }
+  assertSoundFileExists(src, runtime.soundDirectory)
+  const volume = clamp(Number(action.volume ?? 1), 0, 1)
+  const durationMs = getSoundDurationMs(src, runtime.soundDirectory, runtime.logger, runtime.largeSoundWarningBytes)
+  runtime.io.emit('sound-play', { src, volume })
+  return { type: 'sound.play', src, volume, durationMs }
+}
+
+function maybePlayAlertSound(action, context, { hasExplicitSoundAction = false } = {}, runtime) {
+  if (action.sound === false || action.playSound === false) return null
+  if (hasExplicitSoundAction && action.sound === undefined && action.soundSrc === undefined && action.src === undefined) return null
+
+  const requestedSrc = action.sound === true
+    ? runtime.defaultAlertSound
+    : action.sound || action.soundSrc || action.src || runtime.defaultAlertSound
+  const src = validateSoundSrc(hydrate(requestedSrc, context))
+  if (!src) return null
+
+  assertSoundFileExists(src, runtime.soundDirectory)
+  const volume = clamp(Number(action.volume ?? 1), 0, 1)
+  const durationMs = getSoundDurationMs(src, runtime.soundDirectory, runtime.logger, runtime.largeSoundWarningBytes)
+  runtime.io.emit('sound-play', { src, volume })
+  return { type: 'sound.play', src, volume, durationMs, source: 'overlay.alert' }
 }
 
 function validateActionStructure(actions) {
@@ -293,18 +306,23 @@ function validateActionStructure(actions) {
     if (typeof type !== 'string' || !type.trim()) {
       throw userInputError('Action type is required')
     }
-    if (!Object.hasOwn(ACTION_VALIDATION_RULES, type)) {
+    const definition = getActionDefinition(type)
+    if (!definition) {
       throw userInputError(`Unknown action type: ${type}`)
     }
 
-    validateRequiredActionFields(type, action)
+    validateRequiredActionFields(type, action, definition)
   }
 
   return actionList
 }
 
-function validateRequiredActionFields(type, action) {
-  for (const fields of ACTION_VALIDATION_RULES[type]) {
+function getActionDefinition(type) {
+  return Object.hasOwn(ACTION_DEFINITIONS, type) ? ACTION_DEFINITIONS[type] : null
+}
+
+function validateRequiredActionFields(type, action, definition) {
+  for (const fields of definition.requiredFields) {
     if (!fields.some(field => hasActionValue(action[field]))) {
       throw userInputError(`${type} requires ${fields.join(' or ')}`)
     }
@@ -412,13 +430,15 @@ function shouldSuppressAction(type, context, quietMode) {
 }
 
 function isQuietableAction(type) {
-  return type === 'overlay.alert' || type === 'overlay.emit' || type === 'sound.play' || type === 'sound.pickRandom'
+  const definition = getActionDefinition(type)
+  return Boolean(definition && definition.quietable)
 }
 
 function isSoundAction(action) {
   if (!action || typeof action !== 'object') return false
   const type = action.type || action.action
-  return type === 'sound.play' || type === 'sound.pickRandom'
+  const definition = getActionDefinition(type)
+  return Boolean(definition && definition.sound)
 }
 
 function isViewerTriggeredContext(context = {}) {
