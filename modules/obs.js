@@ -1,4 +1,5 @@
 const { default: OBSWebSocket } = require('obs-websocket-js')
+const { userInputError } = require('./errors')
 
 function createObsService({ logger = console } = {}) {
   const obs = new OBSWebSocket()
@@ -229,12 +230,6 @@ function normalizeMediaAction(action) {
 function normalizeReconnectMs(value, defaultValue = 5000) {
   const interval = Number(value)
   return Number.isFinite(interval) && interval >= 1000 ? Math.round(interval) : defaultValue
-}
-
-function userInputError(message) {
-  const error = new Error(message)
-  error.statusCode = 400
-  return error
 }
 
 module.exports = {

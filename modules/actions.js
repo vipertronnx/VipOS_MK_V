@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { getAudioDurationMs } = require('./audio-duration')
+const { userInputError } = require('./errors')
 const { createGreetingService } = require('./greetings')
 
 const DEFAULT_SOUND_DIRECTORY = path.join(__dirname, '..', 'public', 'assets', 'sounds')
@@ -30,12 +31,6 @@ const ACTION_VALIDATION_RULES = {
 const soundListCache = new Map()
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
-
-function userInputError(message) {
-  const error = new Error(message)
-  error.statusCode = 400
-  return error
-}
 
 function validateSoundSrc(src) {
   if (typeof src !== 'string') return null

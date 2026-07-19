@@ -1,4 +1,5 @@
 const { normalizeCompletionDelay } = require('./completion-delay')
+const { userInputError } = require('./errors')
 
 function createActionQueue({
   actions,
@@ -232,12 +233,6 @@ function flattenResults(value) {
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-function userInputError(message) {
-  const error = new Error(message)
-  error.statusCode = 400
-  return error
 }
 
 module.exports = {

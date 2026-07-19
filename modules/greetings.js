@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { userInputError } = require('./errors')
 const { createPersistenceError, writeJsonFile } = require('./json-file')
 
 const DEFAULT_GREETINGS_FILE = path.join(__dirname, '..', 'config', 'greetings.json')
@@ -173,12 +174,6 @@ function resolveConfigJsonPath(value, fallback) {
 
 function relativePath(filePath) {
   return path.relative(path.join(__dirname, '..'), filePath).replace(/\\/g, '/')
-}
-
-function userInputError(message) {
-  const error = new Error(message)
-  error.statusCode = 400
-  return error
 }
 
 module.exports = {
