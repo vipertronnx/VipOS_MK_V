@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { writeJsonFile } = require('../json-file')
 const { testRegex } = require('./chat-regex')
 const {
   createAutomaticRedemptionContext,
@@ -1281,7 +1282,6 @@ function persistToken(tokenFile, userId, token, logger) {
   if (!tokenFile) return
 
   try {
-    fs.mkdirSync(path.dirname(tokenFile), { recursive: true })
     const payload = {
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,
@@ -1291,9 +1291,7 @@ function persistToken(tokenFile, userId, token, logger) {
       updatedAt: new Date().toISOString(),
       userId
     }
-    const tempFile = `${tokenFile}.tmp`
-    fs.writeFileSync(tempFile, `${JSON.stringify(payload, null, 2)}\n`)
-    fs.renameSync(tempFile, tokenFile)
+    writeJsonFile(tokenFile, payload)
   } catch (error) {
     logger.error(`Failed to persist Twitch token: ${error.message}`)
   }

@@ -73,6 +73,7 @@ async function waitFor(predicate, timeoutMs = 1000) {
 
 function createTwurpleStub({
   getTokenInfo,
+  onRefreshingAuthProvider = () => {},
   onAutomaticRedemption = () => {},
   onChatMessage = () => {},
   onFollow = () => {},
@@ -154,9 +155,12 @@ function createTwurpleStub({
   class RefreshingAuthProvider {
     constructor() {
       this.users = []
+      onRefreshingAuthProvider(this)
     }
 
-    onRefresh() {}
+    onRefresh(handler) {
+      this.refreshHandler = handler
+    }
     onRefreshFailure() {}
 
     async addUserForToken(token) {
@@ -395,6 +399,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
       let rewardAddHandler = null
       let rewardRemoveHandler = null
       let rewardUpdateHandler = null
+      let refreshingAuthProvider = null
       let subscriptionGiftHandler = null
       let subscriptionHandler = null
       const eventSubRegistrations = {}
@@ -417,6 +422,9 @@ async function withChatAutomationHarness(automationConfig, fn, {
         twurpleLoader: async () => createTwurpleStub({
           async getTokenInfo() {
             return { scopes: [], userId: 'bot-123' }
+          },
+          onRefreshingAuthProvider(provider) {
+            refreshingAuthProvider = provider
           },
           onChatMessage({ handler }) {
             chatMessageHandler = handler
@@ -468,8 +476,13 @@ async function withChatAutomationHarness(automationConfig, fn, {
         assert.equal(typeof chatMessageHandler, 'function')
         await fn({
           chat,
+          broadcasterTokenFile,
           errors,
           queued,
+          refreshToken(userId, token) {
+            assert.equal(typeof refreshingAuthProvider?.refreshHandler, 'function')
+            refreshingAuthProvider.refreshHandler(userId, token)
+          },
           sendMessage(event) {
             assert.equal(typeof chatMessageHandler, 'function')
             chatMessageHandler(event)
@@ -514,7 +527,8 @@ async function withChatAutomationHarness(automationConfig, fn, {
             assert.equal(typeof rewardUpdateHandler, 'function')
             rewardUpdateHandler(event)
           },
-          eventSubRegistrations
+          eventSubRegistrations,
+          tokenFile
         })
       } finally {
         chat.stop()
@@ -1197,6 +1211,104 @@ test('follow, subscription, and redemption EventSub handlers still require broad
     }).needsBroadcasterToken,
     true
   )
+})
+
+test('Twitch bot refreshes persist the refreshed token with the JSON file contract', async () => {
+  await withChatAutomationHarness({}, async ({ errors, refreshToken, tokenFile }) => {
+    refreshToken('bot-123', {
+      accessToken: 'refreshed-access-token',
+      expiresIn: 3600,
+      obtainmentTimestamp: 123456789,
+      refreshToken: 'refreshed-refresh-token',
+      scope: ['user:read:chat', 'user:write:chat']
+    })
+
+    const raw = fs.readFileSync(tokenFile, 'utf8')
+    const { updatedAt, ...payload } = JSON.parse(raw)
+
+    assert.deepEqual(payload, {
+      accessToken: 'refreshed-access-token',
+      expiresIn: 3600,
+      obtainmentTimestamp: 123456789,
+      refreshToken: 'refreshed-refresh-token',
+      scope: ['user:read:chat', 'user:write:chat'],
+      userId: 'bot-123'
+    })
+    assert.match(updatedAt, /^\d{4}-\d{2}-\d{2}T/)
+    assert.match(raw, /^\{\n  "accessToken":/)
+    assert.ok(raw.endsWith('\n'))
+    assert.deepEqual(errors, [])
+  }, { useBroadcasterAuth: true })
+})
+
+test('Twitch refreshes persist bot and broadcaster tokens to their configured files', async () => {
+  await withBroadcasterChatAutomationHarness({
+    follows: [
+      {
+        actions: [{ type: 'log', message: 'Followed' }],
+        name: 'follow'
+      }
+    ]
+  }, async ({ broadcasterTokenFile, errors, refreshToken, tokenFile }) => {
+    refreshToken('bot-123', {
+      accessToken: 'bot-access-token',
+      expiresIn: 3600,
+      obtainmentTimestamp: 100,
+      refreshToken: 'bot-refresh-token',
+      scope: ['user:read:chat']
+    })
+    refreshToken('channel-123', {
+      accessToken: 'broadcaster-access-token',
+      expiresIn: 7200,
+      obtainmentTimestamp: 200,
+      refreshToken: 'broadcaster-refresh-token',
+      scope: ['moderator:read:followers']
+    })
+
+    const botToken = JSON.parse(fs.readFileSync(tokenFile, 'utf8'))
+    const broadcasterToken = JSON.parse(fs.readFileSync(broadcasterTokenFile, 'utf8'))
+
+    assert.equal(botToken.accessToken, 'bot-access-token')
+    assert.equal(botToken.userId, 'bot-123')
+    assert.equal(broadcasterToken.accessToken, 'broadcaster-access-token')
+    assert.equal(broadcasterToken.userId, 'channel-123')
+    assert.deepEqual(errors, [])
+  })
+})
+
+test('Twitch token persistence failures are logged without escaping refresh callbacks', async () => {
+  await withChatAutomationHarness({}, async ({ errors, refreshToken, tokenFile }) => {
+    const originalRenameSync = fs.renameSync
+    fs.renameSync = function renameTokenFileWithFailure(source, target) {
+      if (path.resolve(target) === path.resolve(tokenFile)) {
+        const error = new Error('token rename failed')
+        error.code = 'EIO'
+        throw error
+      }
+      return originalRenameSync.call(this, source, target)
+    }
+
+    try {
+      assert.doesNotThrow(() => {
+        refreshToken('bot-123', {
+          accessToken: 'refreshed-access-token',
+          expiresIn: 3600,
+          obtainmentTimestamp: 123456789,
+          refreshToken: 'refreshed-refresh-token',
+          scope: []
+        })
+      })
+    } finally {
+      fs.renameSync = originalRenameSync
+    }
+
+    assert.deepEqual(errors, ['Failed to persist Twitch token: token rename failed'])
+    assert.equal(fs.existsSync(tokenFile), false)
+    assert.deepEqual(
+      fs.readdirSync(path.dirname(tokenFile)).filter(name => name.startsWith(`${path.basename(tokenFile)}.`) && name.endsWith('.tmp')),
+      []
+    )
+  }, { useBroadcasterAuth: true })
 })
 
 test('malformed Twitch token files are non-retryable startup errors', () => {
