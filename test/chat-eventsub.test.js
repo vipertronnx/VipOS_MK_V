@@ -494,6 +494,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
           },
           onRewardAdd(registration) {
             eventSubRegistrations.rewardAdd = registration
+            eventSubRegistrationCounts.rewardAdd = (eventSubRegistrationCounts.rewardAdd || 0) + 1
             rewardAddHandler = registration.handler
           },
           onRewardRemove(registration) {
@@ -1226,7 +1227,11 @@ test('EventSub socket lifecycle distinguishes bot and broadcaster connections', 
     assert.equal(chat.getStatus().connected, false)
     assert.equal(chat.getStatus().lastError, 'bot socket closed')
 
+    emitSocketConnect('bot-123')
+    assert.equal(chat.getStatus().connected, true)
+
     emitSocketDisconnect('channel-123', new Error('broadcaster socket closed'))
+    assert.equal(chat.getStatus().connected, true)
     assert.equal(chat.getStatus().rewardsLastError, 'broadcaster socket closed')
     assert.ok(warnings.includes('Twitch EventSub socket disconnected: bot socket closed'))
     assert.ok(warnings.includes('Twitch reward EventSub socket disconnected: broadcaster socket closed'))
@@ -1262,7 +1267,13 @@ test('non-reward EventSub failures and revocations restart the chat listener', a
 test('reward EventSub failures retry only the affected subscription and reset on success', async () => {
   const subscription = { id: 'channel.channel_points_custom_reward_redemption.add.channel-123' }
 
-  await withBroadcasterChatAutomationHarness({}, async ({
+  await withBroadcasterChatAutomationHarness({
+    rewardEvents: [{
+      actions: [],
+      match: { event: 'reward.add' },
+      name: 'unaffected-reward-add'
+    }]
+  }, async ({
     chat,
     emitRevoke,
     emitSubscriptionCreateFailure,
@@ -1272,6 +1283,7 @@ test('reward EventSub failures retry only the affected subscription and reset on
     warnings
   }) => {
     assert.equal(eventSubRegistrationCounts.redemptionAdd, 1)
+    assert.equal(eventSubRegistrationCounts.rewardAdd, 1)
 
     emitSubscriptionCreateFailure(subscription, new Error('reward subscription failed'))
 
@@ -1285,6 +1297,7 @@ test('reward EventSub failures retry only the affected subscription and reset on
     ])
 
     await waitFor(() => eventSubRegistrationCounts.redemptionAdd === 2)
+    assert.equal(eventSubRegistrationCounts.rewardAdd, 1)
     assert.equal(chat.getStatus().rewardsNextRetryAt, null)
 
     emitSubscriptionCreateSuccess(subscription)
@@ -1302,6 +1315,7 @@ test('reward EventSub failures retry only the affected subscription and reset on
     assert.ok(warnings.includes('Twitch reward subscription revoked: channel.channel_points_custom_reward_redemption.add.channel-123'))
 
     await waitFor(() => eventSubRegistrationCounts.redemptionAdd === 3)
+    assert.equal(eventSubRegistrationCounts.rewardAdd, 1)
     emitSubscriptionCreateSuccess(subscription)
 
     status = chat.getStatus()
