@@ -46,6 +46,17 @@ const DEFAULT_COMMAND_PREFIX = '!'
 const DEFAULT_COMMANDS_FILE = path.join(__dirname, '..', '..', 'config', 'commands.json')
 const DEFAULT_RECONNECT_INITIAL_MS = 5000
 const DEFAULT_RECONNECT_MAX_MS = 60000
+const EVENT_SUB_HANDLER_GROUPS = Object.freeze({
+  automaticRedemptions: 'automatic redemptions',
+  follows: 'follows',
+  raids: 'raids',
+  redemptions: 'redemptions',
+  redemptionUpdates: 'redemption updates',
+  rewardAddEvents: 'reward add events',
+  rewardRemoveEvents: 'reward remove events',
+  rewardUpdateEvents: 'reward update events',
+  subscriptions: 'subscriptions'
+})
 
 let twurpleModules = null
 
@@ -317,8 +328,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     }
 
     registrations.push({
-      group: 'redemptions',
-      reward: true,
+      group: EVENT_SUB_HANDLER_GROUPS.redemptions,
       register: eventSubListener => eventSubListener.onChannelRedemptionAdd(
         state.broadcasterId,
         createEventHandler(event => handleRedemption('redemption.add', event), 'rewardsLastError', 'redemption')
@@ -327,8 +337,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (redemptionUpdateHandlers.length) {
       registrations.push({
-        group: 'redemption updates',
-        reward: true,
+        group: EVENT_SUB_HANDLER_GROUPS.redemptionUpdates,
         register: eventSubListener => eventSubListener.onChannelRedemptionUpdate(
           state.broadcasterId,
           createEventHandler(event => handleRedemption('redemption.update', event), 'rewardsLastError', 'redemption update')
@@ -338,8 +347,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (automaticRedemptionHandlers.length) {
       registrations.push({
-        group: 'automatic redemptions',
-        reward: true,
+        group: EVENT_SUB_HANDLER_GROUPS.automaticRedemptions,
         register: eventSubListener => eventSubListener.onChannelAutomaticRewardRedemptionAddV2(
           state.broadcasterId,
           createEventHandler(handleAutomaticRedemption, 'rewardsLastError', 'automatic redemption')
@@ -349,8 +357,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (shouldBindRewardEvent('reward.add')) {
       registrations.push({
-        group: 'reward add events',
-        reward: true,
+        group: EVENT_SUB_HANDLER_GROUPS.rewardAddEvents,
         register: eventSubListener => eventSubListener.onChannelRewardAdd(
           state.broadcasterId,
           createEventHandler(event => handleRewardEvent('reward.add', event), 'rewardsLastError', 'reward add')
@@ -360,8 +367,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (shouldBindRewardEvent('reward.update')) {
       registrations.push({
-        group: 'reward update events',
-        reward: true,
+        group: EVENT_SUB_HANDLER_GROUPS.rewardUpdateEvents,
         register: eventSubListener => eventSubListener.onChannelRewardUpdate(
           state.broadcasterId,
           createEventHandler(event => handleRewardEvent('reward.update', event), 'rewardsLastError', 'reward update')
@@ -371,8 +377,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (shouldBindRewardEvent('reward.remove')) {
       registrations.push({
-        group: 'reward remove events',
-        reward: true,
+        group: EVENT_SUB_HANDLER_GROUPS.rewardRemoveEvents,
         register: eventSubListener => eventSubListener.onChannelRewardRemove(
           state.broadcasterId,
           createEventHandler(event => handleRewardEvent('reward.remove', event), 'rewardsLastError', 'reward remove')
@@ -392,7 +397,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
         logger.warn(state.lastError)
       } else {
         registrations.push({
-          group: 'follows',
+          group: EVENT_SUB_HANDLER_GROUPS.follows,
           register: eventSubListener => eventSubListener.onChannelFollow(
             state.broadcasterId,
             state.broadcasterAuthUserId,
@@ -404,7 +409,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (raidHandlers.length) {
       registrations.push({
-        group: 'raids',
+        group: EVENT_SUB_HANDLER_GROUPS.raids,
         register: eventSubListener => eventSubListener.onChannelRaidTo(
           state.broadcasterId,
           createEventHandler(handleRaid, 'lastError', 'raid')
@@ -415,14 +420,14 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     if (subscriptionHandlers.length) {
       registrations.push(
         {
-          group: 'subscriptions',
+          group: EVENT_SUB_HANDLER_GROUPS.subscriptions,
           register: eventSubListener => eventSubListener.onChannelSubscription(
             state.broadcasterId,
             createEventHandler(handleSubscription, 'lastError', 'subscription')
           )
         },
         {
-          group: 'subscriptions',
+          group: EVENT_SUB_HANDLER_GROUPS.subscriptions,
           register: eventSubListener => eventSubListener.onChannelSubscriptionGift(
             state.broadcasterId,
             createEventHandler(handleSubscriptionGift, 'lastError', 'subscription gift')
@@ -928,15 +933,15 @@ function getConfiguredEventSubHandlerGroups({
   subscriptionHandlerCount = 0
 } = {}) {
   return new Set([
-    followHandlerCount ? 'follows' : '',
-    raidHandlerCount ? 'raids' : '',
-    subscriptionHandlerCount ? 'subscriptions' : '',
-    redemptionHandlerCount ? 'redemptions' : '',
-    redemptionUpdateHandlerCount ? 'redemption updates' : '',
-    automaticRedemptionHandlerCount ? 'automatic redemptions' : '',
-    rewardAddEventHandlerCount ? 'reward add events' : '',
-    rewardUpdateEventHandlerCount ? 'reward update events' : '',
-    rewardRemoveEventHandlerCount ? 'reward remove events' : ''
+    followHandlerCount ? EVENT_SUB_HANDLER_GROUPS.follows : '',
+    raidHandlerCount ? EVENT_SUB_HANDLER_GROUPS.raids : '',
+    subscriptionHandlerCount ? EVENT_SUB_HANDLER_GROUPS.subscriptions : '',
+    redemptionHandlerCount ? EVENT_SUB_HANDLER_GROUPS.redemptions : '',
+    redemptionUpdateHandlerCount ? EVENT_SUB_HANDLER_GROUPS.redemptionUpdates : '',
+    automaticRedemptionHandlerCount ? EVENT_SUB_HANDLER_GROUPS.automaticRedemptions : '',
+    rewardAddEventHandlerCount ? EVENT_SUB_HANDLER_GROUPS.rewardAddEvents : '',
+    rewardUpdateEventHandlerCount ? EVENT_SUB_HANDLER_GROUPS.rewardUpdateEvents : '',
+    rewardRemoveEventHandlerCount ? EVENT_SUB_HANDLER_GROUPS.rewardRemoveEvents : ''
   ].filter(Boolean))
 }
 

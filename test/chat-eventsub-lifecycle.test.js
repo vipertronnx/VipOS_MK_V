@@ -38,42 +38,64 @@ class EventSubWsListenerStub {
   }
 }
 
-test('EventSub lifecycle owns listener activity and registered handler groups', () => {
+async function waitFor(predicate, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    if (predicate()) return
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+
+  assert.fail('Timed out waiting for condition')
+}
+
+test('EventSub lifecycle owns listener activity, handler groups, and reward retries', async () => {
   const state = {}
-  const registrations = []
+  const registrationListeners = []
   const lifecycle = createEventSubLifecycle({
     config: { reconnectInitialMs: 1, reconnectMaxMs: 1 },
+    logger: { error() {}, log() {}, warn() {} },
     updateState: nextState => Object.assign(state, nextState)
   })
+  const rewardSubscription = {
+    id: 'channel.channel_points_custom_reward_redemption.add.channel-123'
+  }
 
-  lifecycle.start({
-    apiClient: { name: 'api-client' },
-    EventSubWsListener: EventSubWsListenerStub,
-    botUserId: 'bot-123',
-    broadcasterAuthUserId: 'channel-123',
-    registrations: [
-      {
-        group: 'redemptions',
-        reward: true,
-        register(listener) {
-          registrations.push(listener)
-          return { id: 'channel.channel_points_custom_reward_redemption.add.channel-123' }
+  try {
+    lifecycle.start({
+      apiClient: { name: 'api-client' },
+      EventSubWsListener: EventSubWsListenerStub,
+      botUserId: 'bot-123',
+      broadcasterAuthUserId: 'channel-123',
+      registrations: [
+        {
+          group: 'redemptions',
+          register(listener) {
+            registrationListeners.push(listener)
+            return rewardSubscription
+          }
+        },
+        {
+          group: 'raids',
+          register(listener) {
+            registrationListeners.push(listener)
+          }
         }
-      },
-      {
-        group: 'raids',
-        register(listener) {
-          registrations.push(listener)
-        }
-      }
-    ]
-  })
+      ]
+    })
 
-  assert.equal(lifecycle.isActive(), true)
-  assert.equal(registrations.length, 2)
-  assert.deepEqual([...lifecycle.getSubscribedGroups()], ['redemptions', 'raids'])
+    assert.equal(lifecycle.isActive(), true)
+    assert.equal(registrationListeners.length, 2)
+    assert.deepEqual([...lifecycle.getSubscribedGroups()], ['redemptions', 'raids'])
 
-  lifecycle.stop()
+    registrationListeners[0].subscriptionFailureHandler(rewardSubscription, new Error('subscription failed'))
+    assert.equal(state.rewardsLastError, 'subscription failed')
+    assert.equal(state.rewardsRetryAttempt, 1)
+    await waitFor(() => registrationListeners.length === 3)
+    assert.equal(registrationListeners[2], registrationListeners[0])
+  } finally {
+    lifecycle.stop()
+  }
 
   assert.equal(lifecycle.isActive(), false)
   assert.equal(state.connected, false)

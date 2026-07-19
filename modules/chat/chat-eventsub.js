@@ -45,7 +45,7 @@ function createEventSubLifecycle({
 
     for (const registration of registrations) {
       const subscription = registration.register(listener)
-      if (registration.reward) trackRewardSubscription(subscription, registration.register)
+      if (isRewardSubscription(subscription)) trackRewardSubscription(subscription, registration.register)
       if (registration.group) nextSubscribedGroups.add(registration.group)
     }
 
@@ -168,7 +168,7 @@ function createEventSubLifecycle({
 }
 
 function isRewardSubscription(subscription) {
-  return String(subscription.id || '').startsWith('channel.channel_points_')
+  return String((subscription && subscription.id) || '').startsWith('channel.channel_points_')
 }
 
 module.exports = {
