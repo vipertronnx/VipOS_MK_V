@@ -19,7 +19,7 @@ The server listens on `127.0.0.1`. It is designed to run on the same machine as 
 
 ## Requirements
 
-- Node.js 18 or newer
+- Node.js 22 or newer
 - npm
 - OBS with its WebSocket server enabled, if OBS actions are needed
 - Twitch application credentials and user tokens, if Twitch integration is enabled

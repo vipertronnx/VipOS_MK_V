@@ -4,7 +4,7 @@ This guide starts VipOS MK V locally, then adds OBS and Twitch only when those i
 
 ## Prerequisites
 
-Install Node.js 18 or newer and npm. The required Node.js version is declared in `package.json`.
+Install Node.js 22 or newer and npm. The required Node.js version is declared in `package.json`.
 
 OBS and Twitch are optional. The web application, control panel, overlays, macros that do not call OBS or chat, and dry-run Twitch simulator can operate without live integrations.
 

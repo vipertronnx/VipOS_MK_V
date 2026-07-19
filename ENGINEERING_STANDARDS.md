@@ -6,7 +6,7 @@ The terms **must**, **should**, and **may** indicate required, recommended, and 
 
 ## Platform and module conventions
 
-- Production code must support the Node.js version declared in `package.json` (`>=18.0.0`).
+- Production code must support the Node.js version declared in `package.json` (`>=22.0.0`).
 - Server-side code must use CommonJS modules (`require` and `module.exports`).
 - Dependencies must be declared in `package.json`; runtime packages belong in `dependencies` and development-only tools belong in `devDependencies`.
 - A package must not be added when the same result is straightforward with the platform or an existing dependency.

@@ -147,7 +147,7 @@ The API does not implement user authentication. Do not expose it through another
 
 ### The application does not start
 
-- Confirm `node --version` reports Node.js 18 or newer.
+- Confirm `node --version` reports Node.js 22 or newer.
 - Run `npm install` after pulling dependency changes.
 - Check `.env` values for an invalid `PORT`.
 
