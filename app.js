@@ -101,10 +101,33 @@ function createRuntimeServices({ io }) {
   }
 }
 
-async function startRuntimeServices({ chat, obs, raffle }) {
+async function startRuntimeServices({ chat, obs, raffle }, { shouldContinue = () => true } = {}) {
+  if (!shouldContinue()) return
   obs.connect()
+  if (!shouldContinue()) return
   await chat.start()
+  if (!shouldContinue()) return
   if (!chat.getStatus().enabled) raffle.startTimers()
+}
+
+async function stopRuntimeServices({ chat, lowerThirdSync, obs, raffle } = {}) {
+  const errors = []
+  const cleanup = [
+    () => raffle?.stopTimers?.(),
+    () => chat?.stop?.(),
+    () => lowerThirdSync?.stop?.(),
+    () => obs?.disconnect?.()
+  ]
+
+  for (const stop of cleanup) {
+    try {
+      await stop()
+    } catch (error) {
+      errors.push(error)
+    }
+  }
+
+  if (errors.length) throw new AggregateError(errors, 'Failed to stop runtime services')
 }
 
 function createQuietMode() {
@@ -951,16 +974,54 @@ function startServer({ port = PORT, createServices = createRuntimeServices } = {
   const io = createSocketServer(server, { portContext })
   const services = createServices({ io })
   const app = createApp(services, { portContext })
+  let isStopping = false
+  let runtimeStartPromise = Promise.resolve()
+  let stopPromise = null
   attachAppRequestHandler(server, app)
+
+  function stop() {
+    if (stopPromise) return stopPromise
+
+    stopPromise = (async () => {
+      const errors = []
+      isStopping = true
+
+      try {
+        await runtimeStartPromise
+      } catch (error) {
+        errors.push(error)
+      }
+
+      try {
+        await stopRuntimeServices(services)
+      } catch (error) {
+        errors.push(error)
+      }
+
+      try {
+        await io.close()
+      } catch (error) {
+        errors.push(error)
+      }
+
+      if (errors.length) throw new AggregateError(errors, 'Failed to stop server')
+    })()
+
+    return stopPromise
+  }
 
   server.listen(port, '127.0.0.1', async () => {
     const address = server.address()
     if (address && typeof address === 'object') portContext.setPort(address.port)
     console.log(`server is listening on port ${portContext.getPort()}....`)
-    await startRuntimeServices(services)
+    if (isStopping) return
+    runtimeStartPromise = startRuntimeServices(services, {
+      shouldContinue: () => !isStopping
+    })
+    await runtimeStartPromise
   })
 
-  return { app, server, services }
+  return { app, server, services, stop }
 }
 
 if (require.main === module) {
@@ -973,5 +1034,6 @@ module.exports = {
   createRuntimeServices,
   createSocketServer,
   startRuntimeServices,
+  stopRuntimeServices,
   startServer
 }

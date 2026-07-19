@@ -147,13 +147,16 @@ function createFakeServices() {
 
 function createStartServerServices({ io }) {
   const { services } = createFakeServices()
+  const stopCalls = []
 
   return {
     ...services,
     chat: {
       ...services.chat,
       async start() {},
-      stop() {},
+      stop() {
+        stopCalls.push('chat')
+      },
       getStatus() {
         return { enabled: false }
       }
@@ -161,13 +164,46 @@ function createStartServerServices({ io }) {
     io,
     obs: {
       ...services.obs,
-      connect() {}
+      connect() {},
+      async disconnect() {
+        stopCalls.push('obs')
+      }
     },
     raffle: {
       ...services.raffle,
-      startTimers() {}
-    }
+      startTimers() {},
+      stopTimers() {
+        stopCalls.push('raffle')
+      }
+    },
+    lowerThirdSync: {
+      ...services.lowerThirdSync,
+      stop() {
+        stopCalls.push('lower-third')
+      }
+    },
+    stopCalls
   }
+}
+
+function createDelayedStartServerServices({ io }) {
+  const services = createStartServerServices({ io })
+  let markChatStarted
+  services.chatStarted = new Promise(resolve => {
+    markChatStarted = resolve
+  })
+  services.runtimeEvents = []
+  services.chat.start = async () => {
+    services.runtimeEvents.push('chat.start')
+    markChatStarted()
+    await new Promise(resolve => {
+      services.releaseChatStart = resolve
+    })
+  }
+  services.raffle.startTimers = () => {
+    services.runtimeEvents.push('raffle.start')
+  }
+  return services
 }
 
 function createRealQueueServices(actionRunnerOptions = {}) {
@@ -535,7 +571,7 @@ test('configured application port controls status and local-origin checks', asyn
 })
 
 test('startServer reports and authorizes its dynamically assigned port', async () => {
-  const { server, services } = startServer({
+  const { server, services, stop } = startServer({
     createServices: createStartServerServices,
     port: 0
   })
@@ -568,9 +604,39 @@ test('startServer reports and authorizes its dynamically assigned port', async (
     })
 
     assert.equal(socketResponse.status, 200)
+
+    await stop()
+    await stop()
+    assert.deepEqual(services.stopCalls, ['raffle', 'chat', 'lower-third', 'obs'])
+    assert.equal(server.listening, false)
   } finally {
-    services.io.close()
-    await new Promise(resolve => server.close(resolve))
+    await stop()
+  }
+})
+
+test('startServer teardown prevents a delayed disabled-chat startup from starting raffle timers', async () => {
+  const { server, services, stop } = startServer({
+    createServices: createDelayedStartServerServices,
+    port: 0
+  })
+
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject)
+      server.once('listening', resolve)
+    })
+
+    await services.chatStarted
+    const stopping = stop()
+    services.releaseChatStart()
+    await stopping
+
+    assert.deepEqual(services.runtimeEvents, ['chat.start'])
+    assert.deepEqual(services.stopCalls, ['raffle', 'chat', 'lower-third', 'obs'])
+    assert.equal(server.listening, false)
+  } finally {
+    if (services.releaseChatStart) services.releaseChatStart()
+    await stop()
   }
 })
 

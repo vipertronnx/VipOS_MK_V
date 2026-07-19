@@ -4,7 +4,7 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { startRuntimeServices } = require('../app')
+const { startRuntimeServices, stopRuntimeServices } = require('../app')
 const { createActionQueue } = require('../modules/actions/action-queue')
 const { createActionRunner } = require('../modules/actions/actions')
 const { createRaffleService } = require('../modules/chat/chat-raffles')
@@ -171,4 +171,37 @@ test('disabled chat startup activates raffle timers', async () => {
   })
 
   assert.equal(startTimersCalls, 1)
+})
+
+test('runtime shutdown attempts every cleanup operation before reporting failures', async () => {
+  const calls = []
+
+  await assert.rejects(
+    () => stopRuntimeServices({
+      chat: {
+        stop() {
+          calls.push('chat')
+          throw new Error('chat stop failed')
+        }
+      },
+      lowerThirdSync: {
+        stop() {
+          calls.push('lower-third')
+        }
+      },
+      obs: {
+        async disconnect() {
+          calls.push('obs')
+        }
+      },
+      raffle: {
+        stopTimers() {
+          calls.push('raffle')
+        }
+      }
+    }),
+    error => error instanceof AggregateError && error.errors.length === 1 && error.errors[0].message === 'chat stop failed'
+  )
+
+  assert.deepEqual(calls, ['raffle', 'chat', 'lower-third', 'obs'])
 })

@@ -1,11 +1,19 @@
 const { default: OBSWebSocket } = require('obs-websocket-js')
 const { userInputError } = require('./utils/errors')
 
-function createObsService({ logger = console } = {}) {
-  const obs = new OBSWebSocket()
+function createObsService({
+  clearTimer = clearTimeout,
+  logger = console,
+  obsClient = new OBSWebSocket(),
+  setTimer = setTimeout
+} = {}) {
+  const obs = obsClient
   const address = process.env.OBS_ADDRESS
   const password = process.env.OBS_PASSWORD || undefined
   const reconnectMs = normalizeReconnectMs(process.env.OBS_RECONNECT_RETRY_INTERVAL)
+  let lifecyclePromise = Promise.resolve()
+  let lifecycleVersion = 0
+  let shouldRun = false
 
   const state = {
     enabled: process.env.OBS_ENABLED !== 'false' && Boolean(address),
@@ -45,7 +53,14 @@ function createObsService({ logger = console } = {}) {
     state.currentScene = data.sceneName
   })
 
-  async function connect() {
+  function connect() {
+    const version = ++lifecycleVersion
+    shouldRun = true
+    return scheduleLifecycleTransition(() => connectNow(version))
+  }
+
+  async function connectNow(version) {
+    if (!shouldRun || version !== lifecycleVersion) return
     if (!state.enabled) {
       logger.warn('OBS is disabled because OBS_ADDRESS is not configured')
       return
@@ -54,16 +69,20 @@ function createObsService({ logger = console } = {}) {
     if (state.connecting || state.identified) return
 
     state.connecting = true
-    clearTimeout(state.reconnectTimer)
-    state.reconnectTimer = null
+    clearReconnectTimer()
 
     try {
       const info = await obs.connect(address, password)
+      if (!shouldRun || version !== lifecycleVersion) {
+        await obs.disconnect()
+        return
+      }
       state.connected = true
       state.identified = true
       state.lastError = null
       logger.log('OBS connected and identified', info)
     } catch (error) {
+      if (!shouldRun || version !== lifecycleVersion) return
       state.connected = false
       state.identified = false
       state.lastError = error.message
@@ -74,12 +93,40 @@ function createObsService({ logger = console } = {}) {
     }
   }
 
+  function disconnect() {
+    lifecycleVersion += 1
+    shouldRun = false
+    clearReconnectTimer()
+    return scheduleLifecycleTransition(disconnectNow)
+  }
+
+  async function disconnectNow() {
+    try {
+      await obs.disconnect()
+    } finally {
+      state.connected = false
+      state.identified = false
+      state.connecting = false
+    }
+  }
+
+  function scheduleLifecycleTransition(operation) {
+    const next = lifecyclePromise.then(operation, operation)
+    lifecyclePromise = next.catch(() => {})
+    return next
+  }
+
   function scheduleReconnect() {
-    if (!state.enabled || state.reconnectTimer) return
-    state.reconnectTimer = setTimeout(() => {
+    if (!shouldRun || !state.enabled || state.reconnectTimer) return
+    state.reconnectTimer = setTimer(() => {
       state.reconnectTimer = null
-      connect()
+      void connect()
     }, reconnectMs)
+  }
+
+  function clearReconnectTimer() {
+    if (state.reconnectTimer) clearTimer(state.reconnectTimer)
+    state.reconnectTimer = null
   }
 
   async function call(requestType, requestData = {}) {
@@ -201,6 +248,7 @@ function createObsService({ logger = console } = {}) {
   return {
     connect,
     call,
+    disconnect,
     getCurrentScene,
     getDiscovery,
     getStatus,
