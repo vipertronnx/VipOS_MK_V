@@ -13,6 +13,7 @@ const path = require('path')
 const { assertSoundFileExists, createActionRunner, listSoundFiles, validateSoundSrc } = require('./modules/actions')
 const { createActionQueue } = require('./modules/action-queue')
 const { createChatService } = require('./modules/chat/chat')
+const { normalizeCompletionDelay } = require('./modules/completion-delay')
 const { createGreetingService } = require('./modules/greetings')
 const { createMacroService } = require('./modules/macros')
 const { createObsService } = require('./modules/obs')
@@ -601,12 +602,6 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
   function getRequestCompletionDelay(req) {
     const value = req.body.completionDelayMs ?? req.body.delayMs ?? req.body.queueDelayMs
     return value === undefined ? undefined : normalizeCompletionDelay(value)
-  }
-
-  function normalizeCompletionDelay(value) {
-    const delay = Number(value || 0)
-    if (!Number.isFinite(delay) || delay <= 0) return 0
-    return Math.min(Math.round(delay), 10 * 60 * 1000)
   }
 
   /**

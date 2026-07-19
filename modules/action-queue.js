@@ -1,3 +1,5 @@
+const { normalizeCompletionDelay } = require('./completion-delay')
+
 function createActionQueue({
   actions,
   logger = console,
@@ -33,8 +35,8 @@ function createActionQueue({
       id: nextId++,
       name: String(name || 'Queued action').trim(),
       actions: actionList,
-      completionDelayMs: manualCompletionDelayMs === undefined ? null : normalizeDelay(manualCompletionDelayMs),
-      fallbackCompletionDelayMs: normalizeDelay(
+      completionDelayMs: manualCompletionDelayMs === undefined ? null : normalizeCompletionDelay(manualCompletionDelayMs),
+      fallbackCompletionDelayMs: normalizeCompletionDelay(
         fallbackCompletionDelayMs === undefined ? soundCompletionFallbackMs : fallbackCompletionDelayMs
       ),
       context: { ...context, source },
@@ -199,7 +201,7 @@ function resolveCompletionDelayMs(item, results, soundCompletionBufferMs) {
 
   const soundDurationMs = getLongestSoundDurationMs(soundResults)
   if (soundDurationMs > 0) {
-    return normalizeDelay(soundDurationMs + soundCompletionBufferMs)
+    return normalizeCompletionDelay(soundDurationMs + soundCompletionBufferMs)
   }
 
   return item.fallbackCompletionDelayMs
@@ -226,12 +228,6 @@ function getLongestSoundDurationMs(soundResults) {
 function flattenResults(value) {
   if (!Array.isArray(value)) return [value]
   return value.flatMap(flattenResults)
-}
-
-function normalizeDelay(value) {
-  const delay = Number(value || 0)
-  if (!Number.isFinite(delay) || delay <= 0) return 0
-  return Math.min(Math.round(delay), 10 * 60 * 1000)
 }
 
 function wait(ms) {

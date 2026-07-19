@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { normalizeCompletionDelay } = require('./completion-delay')
 
 const DEFAULT_MACROS_FILE = path.join(__dirname, '..', 'config', 'macros.json')
 const DEFAULT_MACROS_EXAMPLE_FILE = path.join(__dirname, '..', 'config', 'macros.example.json')
@@ -97,7 +98,7 @@ function normalizeMacro(macro) {
     id,
     name,
     description: String(macro.description || macro.help || '').trim(),
-    completionDelayMs: delayValue === undefined ? undefined : normalizeDelay(delayValue),
+    completionDelayMs: delayValue === undefined ? undefined : normalizeCompletionDelay(delayValue),
     actions
   }
 }
@@ -113,12 +114,6 @@ function normalizeId(value) {
 function asArray(value) {
   if (value === undefined || value === null || value === '') return []
   return Array.isArray(value) ? value : [value]
-}
-
-function normalizeDelay(value) {
-  const delay = Number(value || 0)
-  if (!Number.isFinite(delay) || delay <= 0) return 0
-  return Math.min(Math.round(delay), 10 * 60 * 1000)
 }
 
 module.exports = {

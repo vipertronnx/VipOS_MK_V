@@ -101,6 +101,7 @@ test('action structure validation preserves required field alternatives', () => 
     { type: 'chat.say', text: 'Hello' },
     { type: 'context.pickRandom', key: 'greeting' },
     { type: 'obs.media', source: 'Video', media: 'restart' },
+    { type: 'obs.media', input: 'Video', command: 'restart' },
     { type: 'obs.mute', source: 'Music' },
     { type: 'obs.source', input: 'Camera' },
     { type: 'sound.play', path: 'example.mp3' }
