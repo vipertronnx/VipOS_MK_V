@@ -3,6 +3,7 @@ const path = require('path')
 const { getAudioDurationMs } = require('./audio-duration')
 const { userInputError } = require('./errors')
 const { createGreetingService } = require('./greetings')
+const { asArray } = require('./value-normalization')
 
 const DEFAULT_SOUND_DIRECTORY = path.join(__dirname, '..', 'public', 'assets', 'sounds')
 const DEFAULT_SOUND_TEXT_FILE = path.join(__dirname, '..', 'config', 'sfx-text.json')
@@ -626,11 +627,6 @@ function resolveSoundPath(src, soundDirectory) {
 
 function cloneSoundList(sounds) {
   return sounds.map(sound => ({ ...sound }))
-}
-
-function asArray(value) {
-  if (value === undefined || value === null || value === '') return []
-  return Array.isArray(value) ? value : [value]
 }
 
 function normalizeActionDelay(value) {

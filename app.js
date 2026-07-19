@@ -18,6 +18,7 @@ const { createGreetingService } = require('./modules/greetings')
 const { createMacroService } = require('./modules/macros')
 const { createObsService } = require('./modules/obs')
 const { createRaffleService } = require('./modules/raffle')
+const { parseBool } = require('./modules/value-normalization')
 
 const PORT = Number(process.env.PORT) || 5000
 const APP_NAME = process.env.APP_NAME || 'VipOS MK V'
@@ -198,11 +199,6 @@ function createLowerThirdSync(io, toggleIntervalMs) {
 function numberOrDefault(value, defaultValue) {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 ? number : defaultValue
-}
-
-function parseBool(value, defaultValue) {
-  if (value === undefined || value === null || value === '') return defaultValue
-  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase())
 }
 
 function readNewsChyronItems() {

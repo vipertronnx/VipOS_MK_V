@@ -1,6 +1,7 @@
 // Pure chat automation configuration normalization.
 const { normalizeRegex } = require('./chat-regex')
 const { normalizeRole } = require('./chat-context')
+const { asArray } = require('../value-normalization')
 
 function normalizeAutomationConfig(parsed) {
   if (Array.isArray(parsed)) {
@@ -176,11 +177,6 @@ function normalizeEventName(value) {
   }
 
   return aliases[normalized] || normalized
-}
-
-function asArray(value) {
-  if (value === undefined || value === null || value === '') return []
-  return Array.isArray(value) ? value : [value]
 }
 
 function numberOrNull(value) {

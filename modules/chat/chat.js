@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { writeJsonFile } = require('../json-file')
+const { parseBool } = require('../value-normalization')
 const { testRegex } = require('./chat-regex')
 const {
   createAutomaticRedemptionContext,
@@ -1293,11 +1294,6 @@ function normalizeLogin(value) {
 
 function cleanAccessToken(value) {
   return String(value || '').trim().replace(/^oauth:/i, '') || undefined
-}
-
-function parseBool(value, defaultValue) {
-  if (value === undefined || value === null || value === '') return defaultValue
-  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase())
 }
 
 function parseScopes(value) {

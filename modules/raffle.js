@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { createPersistenceError, writeJsonFile } = require('./json-file')
+const { parseBool } = require('./value-normalization')
 
 const DEFAULT_STATE_FILE = path.join(__dirname, '..', 'config', 'raffle.json')
 const DEFAULT_MIN_DELAY_MS = 5 * 60 * 1000
@@ -652,11 +653,6 @@ function numberOrDefault(value, defaultValue) {
 function numberOrZero(value, defaultValue) {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 ? Math.round(number) : defaultValue
-}
-
-function parseBool(value, defaultValue) {
-  if (value === undefined || value === null || value === '') return defaultValue
-  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase())
 }
 
 function nowIso() {
