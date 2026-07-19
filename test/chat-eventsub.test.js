@@ -71,7 +71,20 @@ async function waitFor(predicate, timeoutMs = 1000) {
   assert.fail('Timed out waiting for condition')
 }
 
-function createTwurpleStub({ getTokenInfo, onChatMessage = () => {}, onRaid = () => {} }) {
+function createTwurpleStub({
+  getTokenInfo,
+  onAutomaticRedemption = () => {},
+  onChatMessage = () => {},
+  onFollow = () => {},
+  onRaid = () => {},
+  onRedemptionAdd = () => {},
+  onRedemptionUpdate = () => {},
+  onRewardAdd = () => {},
+  onRewardRemove = () => {},
+  onRewardUpdate = () => {},
+  onSubscription = () => {},
+  onSubscriptionGift = () => {}
+}) {
   class ApiClient {
     constructor() {
       this.users = {
@@ -92,6 +105,39 @@ function createTwurpleStub({ getTokenInfo, onChatMessage = () => {}, onRaid = ()
     onChannelRaidTo(broadcasterId, handler) {
       onRaid({ broadcasterId, handler })
     }
+    onChannelFollow(broadcasterId, moderatorId, handler) {
+      onFollow({ broadcasterId, handler, moderatorId })
+    }
+    onChannelSubscription(broadcasterId, handler) {
+      onSubscription({ broadcasterId, handler })
+    }
+    onChannelSubscriptionGift(broadcasterId, handler) {
+      onSubscriptionGift({ broadcasterId, handler })
+    }
+    onChannelRedemptionAdd(broadcasterId, handler) {
+      onRedemptionAdd({ broadcasterId, handler })
+      return { id: `channel.channel_points_custom_reward_redemption.add.${broadcasterId}` }
+    }
+    onChannelRedemptionUpdate(broadcasterId, handler) {
+      onRedemptionUpdate({ broadcasterId, handler })
+      return { id: `channel.channel_points_custom_reward_redemption.update.${broadcasterId}` }
+    }
+    onChannelAutomaticRewardRedemptionAddV2(broadcasterId, handler) {
+      onAutomaticRedemption({ broadcasterId, handler })
+      return { id: `channel.channel_points_automatic_reward_redemption.add.v2.${broadcasterId}` }
+    }
+    onChannelRewardAdd(broadcasterId, handler) {
+      onRewardAdd({ broadcasterId, handler })
+      return { id: `channel.channel_points_custom_reward.add.${broadcasterId}` }
+    }
+    onChannelRewardUpdate(broadcasterId, handler) {
+      onRewardUpdate({ broadcasterId, handler })
+      return { id: `channel.channel_points_custom_reward.update.${broadcasterId}` }
+    }
+    onChannelRewardRemove(broadcasterId, handler) {
+      onRewardRemove({ broadcasterId, handler })
+      return { id: `channel.channel_points_custom_reward.remove.${broadcasterId}` }
+    }
     onRevoke() {}
     onSubscriptionCreateFailure() {}
     onSubscriptionCreateSuccess() {}
@@ -105,9 +151,30 @@ function createTwurpleStub({ getTokenInfo, onChatMessage = () => {}, onRaid = ()
     }
   }
 
+  class RefreshingAuthProvider {
+    constructor() {
+      this.users = []
+    }
+
+    onRefresh() {}
+    onRefreshFailure() {}
+
+    async addUserForToken(token) {
+      const userId = this.users.length ? 'channel-123' : 'bot-123'
+      this.users.push({ token, userId })
+      return userId
+    }
+
+    getCurrentScopesForUser(userId) {
+      const user = this.users.find(candidate => candidate.userId === userId)
+      return user ? user.token.scope || [] : []
+    }
+  }
+
   return {
     ApiClient,
     EventSubWsListener,
+    RefreshingAuthProvider,
     StaticAuthProvider: class StaticAuthProvider {},
     getTokenInfo
   }
@@ -155,33 +222,180 @@ function createRaidEvent({
   }
 }
 
-async function withChatAutomationHarness(automationConfig, fn) {
+function createFollowEvent({
+  displayName = 'Follower',
+  userId = 'follower-1',
+  username = 'follower'
+} = {}) {
+  return {
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    followDate: new Date('2026-07-18T00:00:00.000Z'),
+    userDisplayName: displayName,
+    userId,
+    userName: username
+  }
+}
+
+function createSubscriptionEvent({
+  displayName = 'Subscriber',
+  isGift = false,
+  tier = '1000',
+  userId = 'subscriber-1',
+  username = 'subscriber'
+} = {}) {
+  return {
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    isGift,
+    tier,
+    userDisplayName: displayName,
+    userId,
+    userName: username
+  }
+}
+
+function createSubscriptionGiftEvent({
+  amount = 3,
+  cumulativeAmount = 5,
+  displayName = 'Gifter',
+  isAnonymous = false,
+  tier = '1000',
+  userId = 'gifter-1',
+  username = 'gifter'
+} = {}) {
+  return {
+    amount,
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    cumulativeAmount,
+    gifterDisplayName: displayName,
+    gifterId: userId,
+    gifterName: username,
+    isAnonymous,
+    tier
+  }
+}
+
+function createRedemptionEvent({
+  input = 'water please',
+  rewardId = 'reward-1',
+  rewardTitle = 'Hydrate',
+  status = 'unfulfilled',
+  userId = 'redeemer-1',
+  username = 'redeemer'
+} = {}) {
+  return {
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    id: `redemption-${status}-${userId}`,
+    input,
+    redemptionDate: new Date('2026-07-18T00:00:00.000Z'),
+    rewardCost: 100,
+    rewardId,
+    rewardPrompt: 'Drink water',
+    rewardTitle,
+    status,
+    userDisplayName: 'Redeemer',
+    userId,
+    userName: username
+  }
+}
+
+function createAutomaticRedemptionEvent({
+  rewardType = 'celebration',
+  userId = 'redeemer-1',
+  username = 'redeemer'
+} = {}) {
+  return {
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    id: `automatic-redemption-${userId}`,
+    messageText: 'Celebrate',
+    redemptionDate: new Date('2026-07-18T00:00:00.000Z'),
+    reward: {
+      channelPoints: 50,
+      emote: { id: 'emote-1', name: 'Celebrate' },
+      type: rewardType
+    },
+    userDisplayName: 'Redeemer',
+    userId,
+    userName: username
+  }
+}
+
+function createRewardEvent({
+  id = 'reward-1',
+  title = 'New Reward'
+} = {}) {
+  return {
+    autoApproved: false,
+    backgroundColor: '#ffffff',
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    cost: 100,
+    globalCooldown: null,
+    id,
+    isEnabled: true,
+    isInStock: true,
+    isPaused: false,
+    maxRedemptionsPerStream: null,
+    maxRedemptionsPerUserPerStream: null,
+    prompt: 'Do a thing',
+    redemptionsThisStream: 0,
+    title,
+    userInputRequired: false
+  }
+}
+
+async function withChatAutomationHarness(automationConfig, fn, {
+  enableRedemptions = false,
+  useBroadcasterAuth = false
+} = {}) {
   await withTempDirectory(async directory => {
     const commandsFile = path.join(directory, 'commands.json')
     const tokenFile = path.join(directory, 'missing-token.json')
+    const broadcasterTokenFile = path.join(directory, 'missing-broadcaster-token.json')
     fs.writeFileSync(commandsFile, JSON.stringify(automationConfig))
 
     await withEnv({
       CHAT_COMMANDS_FILE: commandsFile,
       CHAT_ENABLE_HIGHLIGHT_ALERTS: 'false',
-      CHAT_ENABLE_REDEMPTIONS: 'false',
+      CHAT_ENABLE_REDEMPTIONS: String(enableRedemptions),
       CHAT_ENABLED: 'true',
-      TWITCH_BOT_ACCESS_TOKEN: 'test-access-token',
-      TWITCH_BOT_REFRESH_TOKEN: undefined,
+      TWITCH_BOT_ACCESS_TOKEN: useBroadcasterAuth ? 'test-bot-access-token' : 'test-access-token',
+      TWITCH_BOT_REFRESH_TOKEN: useBroadcasterAuth ? 'test-bot-refresh-token' : undefined,
       TWITCH_BOT_TOKEN: undefined,
       TWITCH_BOT_USER_ID: undefined,
-      TWITCH_BROADCASTER_ACCESS_TOKEN: undefined,
-      TWITCH_BROADCASTER_REFRESH_TOKEN: undefined,
+      TWITCH_BROADCASTER_ACCESS_TOKEN: useBroadcasterAuth ? 'test-broadcaster-access-token' : undefined,
+      TWITCH_BROADCASTER_REFRESH_TOKEN: useBroadcasterAuth ? 'test-broadcaster-refresh-token' : undefined,
+      TWITCH_BROADCASTER_TOKEN_FILE: broadcasterTokenFile,
       TWITCH_CHANNEL: 'test-channel',
       TWITCH_CHANNEL_ID: undefined,
       TWITCH_CLIENT_ID: 'test-client-id',
-      TWITCH_CLIENT_SECRET: undefined,
+      TWITCH_CLIENT_SECRET: useBroadcasterAuth ? 'test-client-secret' : undefined,
       TWITCH_HIGHLIGHT_REWARD_ID: undefined,
       TWITCH_TOKEN_FILE: tokenFile
     }, async () => {
       const queued = []
+      let automaticRedemptionHandler = null
       let chatMessageHandler = null
+      let followHandler = null
       let raidHandler = null
+      let redemptionAddHandler = null
+      let redemptionUpdateHandler = null
+      let rewardAddHandler = null
+      let rewardRemoveHandler = null
+      let rewardUpdateHandler = null
+      let subscriptionGiftHandler = null
+      let subscriptionHandler = null
+      const eventSubRegistrations = {}
       const chat = createChatService({
         actionQueue: {
           enqueue(item) {
@@ -200,6 +414,42 @@ async function withChatAutomationHarness(automationConfig, fn) {
           },
           onRaid({ handler }) {
             raidHandler = handler
+          },
+          onFollow(registration) {
+            eventSubRegistrations.follow = registration
+            followHandler = registration.handler
+          },
+          onSubscription(registration) {
+            eventSubRegistrations.subscription = registration
+            subscriptionHandler = registration.handler
+          },
+          onSubscriptionGift(registration) {
+            eventSubRegistrations.subscriptionGift = registration
+            subscriptionGiftHandler = registration.handler
+          },
+          onRedemptionAdd(registration) {
+            eventSubRegistrations.redemptionAdd = registration
+            redemptionAddHandler = registration.handler
+          },
+          onRedemptionUpdate(registration) {
+            eventSubRegistrations.redemptionUpdate = registration
+            redemptionUpdateHandler = registration.handler
+          },
+          onAutomaticRedemption(registration) {
+            eventSubRegistrations.automaticRedemption = registration
+            automaticRedemptionHandler = registration.handler
+          },
+          onRewardAdd(registration) {
+            eventSubRegistrations.rewardAdd = registration
+            rewardAddHandler = registration.handler
+          },
+          onRewardRemove(registration) {
+            eventSubRegistrations.rewardRemove = registration
+            rewardRemoveHandler = registration.handler
+          },
+          onRewardUpdate(registration) {
+            eventSubRegistrations.rewardUpdate = registration
+            rewardUpdateHandler = registration.handler
           }
         })
       })
@@ -217,12 +467,56 @@ async function withChatAutomationHarness(automationConfig, fn) {
           sendRaid(event) {
             assert.equal(typeof raidHandler, 'function')
             raidHandler(event)
-          }
+          },
+          sendFollow(event) {
+            assert.equal(typeof followHandler, 'function')
+            followHandler(event)
+          },
+          sendSubscription(event) {
+            assert.equal(typeof subscriptionHandler, 'function')
+            subscriptionHandler(event)
+          },
+          sendSubscriptionGift(event) {
+            assert.equal(typeof subscriptionGiftHandler, 'function')
+            subscriptionGiftHandler(event)
+          },
+          sendRedemptionAdd(event) {
+            assert.equal(typeof redemptionAddHandler, 'function')
+            redemptionAddHandler(event)
+          },
+          sendRedemptionUpdate(event) {
+            assert.equal(typeof redemptionUpdateHandler, 'function')
+            redemptionUpdateHandler(event)
+          },
+          sendAutomaticRedemption(event) {
+            assert.equal(typeof automaticRedemptionHandler, 'function')
+            automaticRedemptionHandler(event)
+          },
+          sendRewardAdd(event) {
+            assert.equal(typeof rewardAddHandler, 'function')
+            rewardAddHandler(event)
+          },
+          sendRewardRemove(event) {
+            assert.equal(typeof rewardRemoveHandler, 'function')
+            rewardRemoveHandler(event)
+          },
+          sendRewardUpdate(event) {
+            assert.equal(typeof rewardUpdateHandler, 'function')
+            rewardUpdateHandler(event)
+          },
+          eventSubRegistrations
         })
       } finally {
         chat.stop()
       }
     })
+  })
+}
+
+async function withBroadcasterChatAutomationHarness(automationConfig, fn, options = {}) {
+  return withChatAutomationHarness(automationConfig, fn, {
+    ...options,
+    useBroadcasterAuth: true
   })
 }
 
@@ -480,6 +774,303 @@ test('raid callbacks queue matching handlers and respect handler cooldowns', asy
       'Twitch raid.add incoming-raid'
     ])
   })
+})
+
+test('broadcaster-authenticated follow and subscription callbacks queue matched handlers', async () => {
+  const followActions = [{ type: 'overlay.alert', message: 'New follower' }]
+  const subscriptionActions = [{ type: 'overlay.alert', message: 'New subscription' }]
+  const giftActions = [{ type: 'overlay.alert', message: 'Gift subscription' }]
+
+  await withBroadcasterChatAutomationHarness({
+    follows: [
+      {
+        actions: followActions,
+        match: { userId: 'follower-1' },
+        name: 'new-follower'
+      }
+    ],
+    subscriptions: [
+      {
+        actions: subscriptionActions,
+        match: { event: 'subscription.add', username: 'subscriber' },
+        name: 'new-subscription'
+      },
+      {
+        actions: giftActions,
+        match: { event: 'subscription.gift', username: 'gifter' },
+        name: 'gift-subscription'
+      }
+    ]
+  }, async ({
+    chat,
+    eventSubRegistrations,
+    queued,
+    sendFollow,
+    sendSubscription,
+    sendSubscriptionGift
+  }) => {
+    assert.equal(chat.getStatus().authMode, 'refreshing')
+    assert.equal(chat.getStatus().broadcasterAuthUserId, 'channel-123')
+    assert.deepEqual({
+      followBroadcasterId: eventSubRegistrations.follow.broadcasterId,
+      moderatorId: eventSubRegistrations.follow.moderatorId,
+      subscriptionBroadcasterId: eventSubRegistrations.subscription.broadcasterId,
+      subscriptionGiftBroadcasterId: eventSubRegistrations.subscriptionGift.broadcasterId
+    }, {
+      followBroadcasterId: 'channel-123',
+      moderatorId: 'channel-123',
+      subscriptionBroadcasterId: 'channel-123',
+      subscriptionGiftBroadcasterId: 'channel-123'
+    })
+
+    sendFollow(createFollowEvent())
+    sendSubscription(createSubscriptionEvent())
+    sendSubscriptionGift(createSubscriptionGiftEvent())
+
+    await waitFor(() => queued.length === 3)
+
+    assert.deepEqual(queued.map(item => ({
+      actions: item.actions,
+      name: item.name,
+      source: item.source
+    })), [
+      {
+        actions: followActions,
+        name: 'Twitch follow.add new-follower',
+        source: 'follow'
+      },
+      {
+        actions: subscriptionActions,
+        name: 'Twitch subscription.add new-subscription',
+        source: 'subscription'
+      },
+      {
+        actions: giftActions,
+        name: 'Twitch subscription.gift gift-subscription',
+        source: 'subscription'
+      }
+    ])
+    assert.deepEqual({
+      event: queued[0].context.event,
+      followedAt: queued[0].context.follow.followedAt,
+      source: queued[0].context.source,
+      userId: queued[0].context.userId
+    }, {
+      event: 'follow.add',
+      followedAt: '2026-07-18T00:00:00.000Z',
+      source: 'follow',
+      userId: 'follower-1'
+    })
+    assert.deepEqual({
+      event: queued[1].context.event,
+      source: queued[1].context.source,
+      tier: queued[1].context.subscription.tier,
+      userId: queued[1].context.userId
+    }, {
+      event: 'subscription.add',
+      source: 'subscription',
+      tier: '1000',
+      userId: 'subscriber-1'
+    })
+    assert.deepEqual({
+      amount: queued[2].context.subscription.amount,
+      event: queued[2].context.event,
+      source: queued[2].context.source,
+      userId: queued[2].context.userId
+    }, {
+      amount: 3,
+      event: 'subscription.gift',
+      source: 'subscription',
+      userId: 'gifter-1'
+    })
+
+    sendFollow(createFollowEvent({ userId: 'other-follower', username: 'other' }))
+    await waitFor(() => (
+      chat.getStatus().communityEventCount === 4 &&
+      chat.getStatus().lastCommunityEventMatchedHandlers === 0
+    ))
+
+    assert.equal(queued.length, 3)
+  })
+})
+
+test('broadcaster-authenticated reward callbacks queue matched handlers', async () => {
+  const redemptionActions = [{ type: 'overlay.alert', message: 'Redemption' }]
+  const updateActions = [{ type: 'overlay.alert', message: 'Redemption update' }]
+  const automaticActions = [{ type: 'overlay.alert', message: 'Automatic redemption' }]
+  const rewardAddActions = [{ type: 'overlay.alert', message: 'Reward added' }]
+  const rewardUpdateActions = [{ type: 'overlay.alert', message: 'Reward updated' }]
+  const rewardRemoveActions = [{ type: 'overlay.alert', message: 'Reward removed' }]
+
+  await withBroadcasterChatAutomationHarness({
+    automaticRedemptions: [
+      {
+        actions: automaticActions,
+        match: { event: 'automatic-redemption.add', rewardType: 'celebration' },
+        name: 'automatic-redemption'
+      }
+    ],
+    redemptions: [
+      {
+        actions: redemptionActions,
+        match: {
+          inputContains: 'water',
+          inputMatches: '^water',
+          rewardId: 'reward-1',
+          rewardTitle: 'Hydrate',
+          status: 'unfulfilled',
+          userId: 'redeemer-1',
+          username: 'redeemer'
+        },
+        name: 'hydrate'
+      }
+    ],
+    redemptionUpdates: [
+      {
+        actions: updateActions,
+        match: { rewardId: 'reward-1', status: 'fulfilled' },
+        name: 'hydrate-fulfilled'
+      }
+    ],
+    rewardEvents: [
+      {
+        actions: rewardAddActions,
+        match: { event: 'reward.add', rewardTitle: 'New Reward' },
+        name: 'reward-added'
+      },
+      {
+        actions: rewardUpdateActions,
+        match: { event: 'reward.update', rewardId: 'reward-1' },
+        name: 'reward-updated'
+      },
+      {
+        actions: rewardRemoveActions,
+        match: { event: 'reward.remove', rewardId: 'reward-1' },
+        name: 'reward-removed'
+      }
+    ]
+  }, async ({
+    chat,
+    eventSubRegistrations,
+    queued,
+    sendAutomaticRedemption,
+    sendRedemptionAdd,
+    sendRedemptionUpdate,
+    sendRewardAdd,
+    sendRewardRemove,
+    sendRewardUpdate
+  }) => {
+    assert.equal(chat.getStatus().authMode, 'refreshing')
+    assert.equal(chat.getStatus().broadcasterAuthUserId, 'channel-123')
+    assert.deepEqual(Object.fromEntries([
+      ['automaticRedemption', eventSubRegistrations.automaticRedemption],
+      ['redemptionAdd', eventSubRegistrations.redemptionAdd],
+      ['redemptionUpdate', eventSubRegistrations.redemptionUpdate],
+      ['rewardAdd', eventSubRegistrations.rewardAdd],
+      ['rewardRemove', eventSubRegistrations.rewardRemove],
+      ['rewardUpdate', eventSubRegistrations.rewardUpdate]
+    ].map(([name, registration]) => [name, registration.broadcasterId])), {
+      automaticRedemption: 'channel-123',
+      redemptionAdd: 'channel-123',
+      redemptionUpdate: 'channel-123',
+      rewardAdd: 'channel-123',
+      rewardRemove: 'channel-123',
+      rewardUpdate: 'channel-123'
+    })
+
+    sendRedemptionAdd(createRedemptionEvent())
+    sendRedemptionUpdate(createRedemptionEvent({ status: 'fulfilled' }))
+    sendAutomaticRedemption(createAutomaticRedemptionEvent())
+    sendRewardAdd(createRewardEvent())
+    sendRewardUpdate(createRewardEvent())
+    sendRewardRemove(createRewardEvent())
+
+    await waitFor(() => (
+      queued.length === 6 &&
+      chat.getStatus().lastRewardEventMatchedHandlers === 1
+    ))
+
+    assert.deepEqual(queued.map(item => ({
+      actions: item.actions,
+      name: item.name,
+      source: item.source
+    })), [
+      {
+        actions: redemptionActions,
+        name: 'Twitch redemption.add hydrate',
+        source: 'redemption'
+      },
+      {
+        actions: updateActions,
+        name: 'Twitch redemption.update hydrate-fulfilled',
+        source: 'redemption'
+      },
+      {
+        actions: automaticActions,
+        name: 'Twitch automatic-redemption.add automatic-redemption',
+        source: 'automatic-redemption'
+      },
+      {
+        actions: rewardAddActions,
+        name: 'Twitch reward.add reward-added',
+        source: 'reward'
+      },
+      {
+        actions: rewardUpdateActions,
+        name: 'Twitch reward.update reward-updated',
+        source: 'reward'
+      },
+      {
+        actions: rewardRemoveActions,
+        name: 'Twitch reward.remove reward-removed',
+        source: 'reward'
+      }
+    ])
+    assert.deepEqual({
+      input: queued[0].context.redemption.input,
+      rewardId: queued[0].context.reward.id,
+      source: queued[0].context.source,
+      status: queued[0].context.redemption.status,
+      userId: queued[0].context.userId
+    }, {
+      input: 'water please',
+      rewardId: 'reward-1',
+      source: 'redemption',
+      status: 'unfulfilled',
+      userId: 'redeemer-1'
+    })
+    assert.deepEqual({
+      event: queued[2].context.event,
+      rewardType: queued[2].context.automaticReward.type,
+      source: queued[2].context.source
+    }, {
+      event: 'automatic-redemption.add',
+      rewardType: 'celebration',
+      source: 'automatic-redemption'
+    })
+    assert.deepEqual({
+      event: queued[5].context.event,
+      rewardId: queued[5].context.reward.id,
+      source: queued[5].context.source,
+      title: queued[5].context.reward.title
+    }, {
+      event: 'reward.remove',
+      rewardId: 'reward-1',
+      source: 'reward',
+      title: 'New Reward'
+    })
+    assert.equal(chat.getStatus().redemptionCount, 3)
+    assert.equal(chat.getStatus().rewardEventCount, 3)
+    assert.equal(chat.getStatus().lastRewardEventMatchedHandlers, 1)
+
+    sendRedemptionAdd(createRedemptionEvent({ input: 'juice please' }))
+    await waitFor(() => (
+      chat.getStatus().redemptionCount === 4 &&
+      chat.getStatus().lastRedemptionMatchedHandlers === 0
+    ))
+
+    assert.equal(queued.length, 6)
+  }, { enableRedemptions: true })
 })
 
 test('configured EventSub handler groups match restart-warning group names', () => {
