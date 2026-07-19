@@ -361,6 +361,7 @@ function createRewardEvent({
 async function withChatAutomationHarness(automationConfig, fn, {
   enqueueError = null,
   enableRedemptions = false,
+  useBotRefreshAuth = false,
   useBroadcasterAuth = false
 } = {}) {
   await withTempDirectory(async directory => {
@@ -369,13 +370,15 @@ async function withChatAutomationHarness(automationConfig, fn, {
     const broadcasterTokenFile = path.join(directory, 'missing-broadcaster-token.json')
     fs.writeFileSync(commandsFile, JSON.stringify(automationConfig))
 
+    const useRefreshingAuth = useBotRefreshAuth || useBroadcasterAuth
+
     await withEnv({
       CHAT_COMMANDS_FILE: commandsFile,
       CHAT_ENABLE_HIGHLIGHT_ALERTS: 'false',
       CHAT_ENABLE_REDEMPTIONS: String(enableRedemptions),
       CHAT_ENABLED: 'true',
-      TWITCH_BOT_ACCESS_TOKEN: useBroadcasterAuth ? 'test-bot-access-token' : 'test-access-token',
-      TWITCH_BOT_REFRESH_TOKEN: useBroadcasterAuth ? 'test-bot-refresh-token' : undefined,
+      TWITCH_BOT_ACCESS_TOKEN: useRefreshingAuth ? 'test-bot-access-token' : 'test-access-token',
+      TWITCH_BOT_REFRESH_TOKEN: useRefreshingAuth ? 'test-bot-refresh-token' : undefined,
       TWITCH_BOT_TOKEN: undefined,
       TWITCH_BOT_USER_ID: undefined,
       TWITCH_BROADCASTER_ACCESS_TOKEN: useBroadcasterAuth ? 'test-broadcaster-access-token' : undefined,
@@ -384,7 +387,7 @@ async function withChatAutomationHarness(automationConfig, fn, {
       TWITCH_CHANNEL: 'test-channel',
       TWITCH_CHANNEL_ID: undefined,
       TWITCH_CLIENT_ID: 'test-client-id',
-      TWITCH_CLIENT_SECRET: useBroadcasterAuth ? 'test-client-secret' : undefined,
+      TWITCH_CLIENT_SECRET: useRefreshingAuth ? 'test-client-secret' : undefined,
       TWITCH_HIGHLIGHT_REWARD_ID: undefined,
       TWITCH_TOKEN_FILE: tokenFile
     }, async () => {
@@ -1239,6 +1242,26 @@ test('Twitch bot refreshes persist the refreshed token with the JSON file contra
     assert.ok(raw.endsWith('\n'))
     assert.deepEqual(errors, [])
   }, { useBroadcasterAuth: true })
+})
+
+test('bot-only refreshing auth persists refreshes without broadcaster credentials', async () => {
+  await withChatAutomationHarness({}, async ({ chat, errors, refreshToken, tokenFile }) => {
+    assert.equal(chat.getStatus().authMode, 'refreshing')
+    assert.equal(chat.getStatus().broadcasterAuthUserId, null)
+
+    refreshToken('bot-123', {
+      accessToken: 'bot-only-access-token',
+      expiresIn: 3600,
+      obtainmentTimestamp: 100,
+      refreshToken: 'bot-only-refresh-token',
+      scope: ['user:read:chat', 'user:write:chat']
+    })
+
+    const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8'))
+    assert.equal(token.accessToken, 'bot-only-access-token')
+    assert.equal(token.userId, 'bot-123')
+    assert.deepEqual(errors, [])
+  }, { useBotRefreshAuth: true })
 })
 
 test('Twitch refreshes persist bot and broadcaster tokens to their configured files', async () => {

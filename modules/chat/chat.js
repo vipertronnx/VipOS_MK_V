@@ -942,6 +942,7 @@ async function createAuthProvider(twurple, config, logger, options = {}) {
   const botExpiresIn = botToken.expiresIn || config.botExpiresIn
   const botObtainmentTimestamp = botToken.obtainmentTimestamp || config.botObtainmentTimestamp
   const botScope = botToken.scope || config.botScopes
+  let broadcasterToken = null
 
   if (needsBroadcasterToken) {
     if (!config.clientSecret) {
@@ -952,15 +953,15 @@ async function createAuthProvider(twurple, config, logger, options = {}) {
       throw new ChatConfigError('TWITCH_BOT_REFRESH_TOKEN is required when broadcaster EventSub auth is needed')
     }
 
-    const broadcasterToken = readTokenConfig(config.broadcasterTokenFile)
-    const broadcasterAccessToken = cleanAccessToken(broadcasterToken.accessToken || config.broadcasterAccessToken)
-    const broadcasterRefreshToken = broadcasterToken.refreshToken || config.broadcasterRefreshToken
-    const broadcasterExpiresIn = broadcasterToken.expiresIn || config.broadcasterExpiresIn
-    const broadcasterObtainmentTimestamp = broadcasterToken.obtainmentTimestamp || config.broadcasterObtainmentTimestamp
-    const broadcasterScope = broadcasterToken.scope || config.broadcasterScopes
-
-    if (!broadcasterRefreshToken) {
+    broadcasterToken = readTokenConfig(config.broadcasterTokenFile)
+    if (!(broadcasterToken.refreshToken || config.broadcasterRefreshToken)) {
       throw new ChatConfigError('TWITCH_BROADCASTER_REFRESH_TOKEN is required when broadcaster EventSub auth is needed')
+    }
+  }
+
+  if (botRefreshToken) {
+    if (!config.clientSecret) {
+      throw new ChatConfigError('TWITCH_CLIENT_SECRET is required when using TWITCH_BOT_REFRESH_TOKEN')
     }
 
     const authProvider = new twurple.RefreshingAuthProvider({
@@ -989,6 +990,17 @@ async function createAuthProvider(twurple, config, logger, options = {}) {
     }), [CHAT_INTENT])
     tokenFilesByUserId.set(botUserId, config.tokenFile)
 
+    if (!needsBroadcasterToken) {
+      warnMissingScopes(authProvider.getCurrentScopesForUser(botUserId), CHAT_SCOPES, logger)
+      return { authProvider, botUserId, mode: 'refreshing' }
+    }
+
+    const broadcasterAccessToken = cleanAccessToken(broadcasterToken.accessToken || config.broadcasterAccessToken)
+    const broadcasterRefreshToken = broadcasterToken.refreshToken || config.broadcasterRefreshToken
+    const broadcasterExpiresIn = broadcasterToken.expiresIn || config.broadcasterExpiresIn
+    const broadcasterObtainmentTimestamp = broadcasterToken.obtainmentTimestamp || config.broadcasterObtainmentTimestamp
+    const broadcasterScope = broadcasterToken.scope || config.broadcasterScopes
+
     refreshTokenFile = config.broadcasterTokenFile
     const broadcasterUserId = await authProvider.addUserForToken(buildRefreshingToken({
       accessToken: broadcasterAccessToken,
@@ -1012,37 +1024,6 @@ async function createAuthProvider(twurple, config, logger, options = {}) {
     }
 
     return { authProvider, botUserId, broadcasterUserId, mode: 'refreshing' }
-  }
-
-  if (botRefreshToken) {
-    if (!config.clientSecret) {
-      throw new ChatConfigError('TWITCH_CLIENT_SECRET is required when using TWITCH_BOT_REFRESH_TOKEN')
-    }
-
-    const authProvider = new twurple.RefreshingAuthProvider({
-      clientId: config.clientId,
-      clientSecret: config.clientSecret
-    })
-
-    authProvider.onRefresh((userId, refreshedToken) => {
-      persistToken(config.tokenFile, userId, refreshedToken, logger)
-    })
-
-    authProvider.onRefreshFailure((userId, error) => {
-      logger.error(`Twitch token refresh failed for ${userId}: ${error.message}`)
-    })
-
-    const botUserId = await authProvider.addUserForToken(buildRefreshingToken({
-      accessToken: botAccessToken,
-      expiresIn: botExpiresIn,
-      obtainmentTimestamp: botObtainmentTimestamp,
-      refreshToken: botRefreshToken,
-      scope: botScope
-    }), [CHAT_INTENT])
-
-    warnMissingScopes(authProvider.getCurrentScopesForUser(botUserId), CHAT_SCOPES, logger)
-
-    return { authProvider, botUserId, mode: 'refreshing' }
   }
 
   if (!botAccessToken) {
