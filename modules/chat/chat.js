@@ -13,7 +13,6 @@ const {
 } = require('./chat-auth')
 const { relativeAppPath, resolveAppPath } = require('../utils/app-path')
 const { parseBool } = require('../utils/value-normalization')
-const { testRegex } = require('./chat-regex')
 const {
   createAutomaticRedemptionContext,
   createChatEntryContext,
@@ -25,16 +24,15 @@ const {
   createSubscriptionContext,
   createSubscriptionGiftContext,
   getPrivilegedEntryRoles,
-  normalizeRole,
   summarizeChatEntryContext,
   summarizeCommunityEventContext,
   summarizeRedemptionContext,
   summarizeRewardEventContext
 } = require('./chat-context')
 const {
-  normalizeEventName,
-  normalizeMatchValue
+  normalizeEventName
 } = require('./chat-normalization')
+const { createChatAutomation } = require('./chat-automation')
 const { createCommandConfigLifecycle } = require('./chat-command-config')
 const { createEventSubLifecycle } = require('./chat-eventsub')
 const { createRetryScheduler } = require('./chat-retry')
@@ -61,7 +59,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   if (!actions) throw new Error('Chat service requires an action runner')
 
   const config = readConfig()
-  const cooldowns = new Map()
 
   let api = null
   let authProvider = null
@@ -172,6 +169,17 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     onReloadError(error) {
       state.lastError = error.message
       logger.error(`Failed to reload Twitch commands: ${error.message}`)
+    }
+  })
+
+  const automation = createChatAutomation({
+    actions,
+    actionQueue,
+    defaultAlertSound: config.defaultAlertSound,
+    isSimulating: () => state.simulating,
+    logger,
+    onCommandAccepted() {
+      state.lastCommandAt = new Date().toISOString()
     }
   })
 
@@ -477,7 +485,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     if (config.ignoreSelf && context.chat.chatter.id === state.botUserId) return
 
     if (isHighlightMessage(context, config)) {
-      await runHighlightAlert(context)
+      await automation.runHighlightAlert(context)
     }
 
     const chatEntryKey = getPrivilegedChatEntryKey(
@@ -497,10 +505,13 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
     if (raffle && await raffle.handleChatMessage(context)) return
 
-    const commandMatch = findCommand(context.message)
+    const commandMatch = automation.findCommand(
+      context.message,
+      commandConfig.getSnapshot().commandMap
+    )
     if (!commandMatch) return
 
-    await runCommand(commandMatch, context)
+    await automation.runCommand(commandMatch, context)
   }
 
   async function handleChatEntry(messageContext) {
@@ -508,7 +519,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     state.chatEntryCount += 1
     state.lastChatEntryAt = new Date().toISOString()
     state.lastChatEntry = summarizeChatEntryContext(context)
-    state.lastChatEntryMatchedHandlers = await runConfiguredHandlers(
+    state.lastChatEntryMatchedHandlers = await automation.runConfiguredHandlers(
       commandConfig.getSnapshot().chatEntryHandlers,
       context
     )
@@ -534,7 +545,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     state.redemptionCount += 1
     state.lastRedemptionAt = new Date().toISOString()
     state.lastRedemption = summarizeRedemptionContext(context)
-    state.lastRedemptionMatchedHandlers = await runConfiguredHandlers(handlers, context)
+    state.lastRedemptionMatchedHandlers = await automation.runConfiguredHandlers(handlers, context)
   }
 
   async function handleRewardEvent(eventName, event) {
@@ -542,7 +553,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     state.rewardEventCount += 1
     state.lastRewardEventAt = new Date().toISOString()
     state.lastRewardEvent = summarizeRewardEventContext(context)
-    state.lastRewardEventMatchedHandlers = await runConfiguredHandlers(
+    state.lastRewardEventMatchedHandlers = await automation.runConfiguredHandlers(
       commandConfig.getSnapshot().rewardEventHandlers,
       context
     )
@@ -568,7 +579,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     state.communityEventCount += 1
     state.lastCommunityEventAt = new Date().toISOString()
     state.lastCommunityEvent = summarizeCommunityEventContext(context)
-    state.lastCommunityEventMatchedHandlers = await runConfiguredHandlers(handlers, context)
+    state.lastCommunityEventMatchedHandlers = await automation.runConfiguredHandlers(handlers, context)
   }
 
   async function simulateEvent(type, event) {
@@ -592,116 +603,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     } finally {
       state.simulating = false
     }
-  }
-
-  async function runCommand(commandMatch, context) {
-    const { command, commandName, after, args } = commandMatch
-    const commandContext = {
-      ...context,
-      after,
-      args,
-      command: commandName,
-      commandName,
-      chat: {
-        ...context.chat,
-        after,
-        args,
-        command: commandName
-      }
-    }
-
-    if (!isAllowedRole(command.roles, commandContext.roles)) return
-    if (isCoolingDown(command, commandContext)) return
-
-    state.lastCommandAt = new Date().toISOString()
-    logger.log(`Twitch command ${commandName} from ${commandContext.displayName}`)
-    await runTwitchActions(`Twitch Command ${commandName}`, command.actions, commandContext)
-  }
-
-  async function runConfiguredHandlers(handlers, context) {
-    let matchedCount = 0
-
-    for (const handler of handlers) {
-      if (!matchesHandler(handler, context)) continue
-      if (isCoolingDown(handler, context)) continue
-      matchedCount += 1
-      logger.log(`Twitch ${context.event} action for ${context.displayName || context.reward.title}`)
-      await runTwitchActions(formatHandlerQueueName(handler, context), handler.actions, context)
-    }
-
-    return matchedCount
-  }
-
-  async function runHighlightAlert(context) {
-    const actionList = [
-      {
-        type: 'overlay.alert',
-        message: `{displayName}: {message}`
-      }
-    ]
-
-    if (config.defaultAlertSound) {
-      actionList.push({
-        type: 'sound.play',
-        src: config.defaultAlertSound,
-        volume: 1
-      })
-    }
-
-    await runTwitchActions('Twitch Highlight Alert', actionList, context)
-  }
-
-  async function runTwitchActions(name, actionList, context) {
-    if (!actionQueue) return actions.run(actionList, context)
-
-    return actionQueue.enqueue({
-      name,
-      actions: actionList,
-      context: state.simulating ? { ...context, simulated: true } : context,
-      source: context.source || 'twitch'
-    })
-  }
-
-  function formatHandlerQueueName(handler, context) {
-    const parts = ['Twitch', context.event || 'event']
-    if (handler.name) parts.push(handler.name)
-    return parts.join(' ')
-  }
-
-  function findCommand(message) {
-    const trimmed = String(message || '').trim()
-    if (!trimmed) return null
-
-    const match = trimmed.match(/^(\S+)(?:\s+([\s\S]*))?$/)
-    if (!match) return null
-
-    const commandName = match[1].toLowerCase()
-    const command = commandConfig.getSnapshot().commandMap.get(commandName)
-    if (!command) return null
-
-    const after = (match[2] || '').trim()
-    return {
-      after,
-      args: after ? after.split(/\s+/) : [],
-      command,
-      commandName
-    }
-  }
-
-  function isCoolingDown(command, context) {
-    const seconds = Number(command.cooldownSeconds || 0)
-    if (seconds <= 0) return false
-
-    const scope = command.cooldownScope === 'user'
-      ? (context.userId || (context.chat && context.chat.chatter && context.chat.chatter.id) || 'unknown')
-      : 'global'
-    const key = `${command.key}:${scope}`
-    const now = Date.now()
-    const availableAt = cooldowns.get(key) || 0
-    if (availableAt > now) return true
-
-    cooldowns.set(key, now + seconds * 1000)
-    return false
   }
 
   function applyCommandConfig(snapshot, { loaded = false } = {}) {
@@ -826,49 +727,10 @@ function getPrivilegedChatEntryKey(context, handlers, seenEntrants) {
   return userKey
 }
 
-function isAllowedRole(allowedRoles, actualRoles) {
-  if (!allowedRoles.length) return true
-
-  const actual = new Set(actualRoles.map(normalizeRole))
-  return allowedRoles.some(role => role === 'everyone' || actual.has(role))
-}
-
 function isHighlightMessage(context, config) {
   if (!config.enableHighlightAlerts) return false
   if (context.chat.messageType === 'channel_points_highlighted') return true
   return Boolean(config.highlightRewardId && context.chat.rewardId === config.highlightRewardId)
-}
-
-function matchesHandler(handler, context) {
-  if (handler.events.length && !handler.events.includes(context.event)) return false
-
-  const rewardId = normalizeMatchValue(context.reward && context.reward.id)
-  const rewardTitle = normalizeMatchValue(context.reward && context.reward.title)
-  const rewardType = normalizeMatchValue(
-    (context.automaticReward && context.automaticReward.type) ||
-    (context.reward && context.reward.type)
-  )
-  const status = normalizeMatchValue(context.redemption && context.redemption.status)
-  const userId = normalizeMatchValue(context.userId)
-  const username = normalizeMatchValue(context.username || context.user)
-  const displayName = normalizeMatchValue(context.displayName)
-  const input = normalizeMatchValue(context.input || context.message)
-  const actualRoles = new Set((context.roles || []).map(normalizeRole))
-  const viewerCount = Number(context.viewers || (context.raid && context.raid.viewers) || 0)
-
-  if (handler.rewardIds.length && !handler.rewardIds.includes(rewardId)) return false
-  if (handler.rewardTitles.length && !handler.rewardTitles.includes(rewardTitle)) return false
-  if (handler.rewardTypes.length && !handler.rewardTypes.includes(rewardType)) return false
-  if (handler.statuses.length && !handler.statuses.includes(status)) return false
-  if (handler.userIds.length && !handler.userIds.includes(userId)) return false
-  if (handler.usernames.length && !handler.usernames.includes(username) && !handler.usernames.includes(displayName)) return false
-  if (handler.roles.length && !handler.roles.some(role => actualRoles.has(role))) return false
-  if (handler.inputContains.length && !handler.inputContains.some(value => input.includes(value))) return false
-  if (handler.inputPatterns.length && !handler.inputPatterns.some(pattern => testRegex(pattern, context.input || context.message || ''))) return false
-  if (handler.minViewers !== null && viewerCount < handler.minViewers) return false
-  if (handler.maxViewers !== null && viewerCount > handler.maxViewers) return false
-
-  return true
 }
 
 function getConfiguredEventSubHandlerGroups({

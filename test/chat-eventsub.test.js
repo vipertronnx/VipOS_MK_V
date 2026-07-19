@@ -655,6 +655,7 @@ test('chat commands enqueue configured actions with alias and argument context',
     }))
     await waitFor(() => chat.getStatus().messageCount === 2)
     assert.equal(queued.length, 1)
+    assert.ok(chat.getStatus().lastCommandAt)
 
     const [queueItem] = queued
     assert.deepEqual(queueItem.actions, actions)
