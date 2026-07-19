@@ -71,7 +71,7 @@ async function waitFor(predicate, timeoutMs = 1000) {
   assert.fail('Timed out waiting for condition')
 }
 
-function createTwurpleStub({ getTokenInfo }) {
+function createTwurpleStub({ getTokenInfo, onChatMessage = () => {} }) {
   class ApiClient {
     constructor() {
       this.users = {
@@ -86,7 +86,9 @@ function createTwurpleStub({ getTokenInfo }) {
       this.isActive = false
     }
 
-    onChannelChatMessage() {}
+    onChannelChatMessage(broadcasterId, botUserId, handler) {
+      onChatMessage({ broadcasterId, botUserId, handler })
+    }
     onRevoke() {}
     onSubscriptionCreateFailure() {}
     onSubscriptionCreateSuccess() {}
@@ -107,6 +109,213 @@ function createTwurpleStub({ getTokenInfo }) {
     getTokenInfo
   }
 }
+
+function createChatMessage({
+  badges = {},
+  displayName = 'Viewer',
+  message = '',
+  userId = 'viewer-1',
+  username = 'viewer'
+} = {}) {
+  return {
+    badges,
+    broadcasterDisplayName: 'Test Channel',
+    broadcasterId: 'channel-123',
+    broadcasterName: 'test-channel',
+    chatterDisplayName: displayName,
+    chatterId: userId,
+    chatterName: username,
+    color: '#ffffff',
+    isCheer: false,
+    isRedemption: false,
+    messageId: `message-${userId}-${message}`,
+    messageText: message,
+    messageType: 'text',
+    rewardId: null
+  }
+}
+
+async function withChatCommandHarness(commands, fn) {
+  await withTempDirectory(async directory => {
+    const commandsFile = path.join(directory, 'commands.json')
+    const tokenFile = path.join(directory, 'missing-token.json')
+    fs.writeFileSync(commandsFile, JSON.stringify({ commands }))
+
+    await withEnv({
+      CHAT_COMMANDS_FILE: commandsFile,
+      CHAT_ENABLE_HIGHLIGHT_ALERTS: 'false',
+      CHAT_ENABLE_REDEMPTIONS: 'false',
+      CHAT_ENABLED: 'true',
+      TWITCH_BOT_ACCESS_TOKEN: 'test-access-token',
+      TWITCH_BOT_REFRESH_TOKEN: undefined,
+      TWITCH_BOT_TOKEN: undefined,
+      TWITCH_BOT_USER_ID: undefined,
+      TWITCH_BROADCASTER_ACCESS_TOKEN: undefined,
+      TWITCH_BROADCASTER_REFRESH_TOKEN: undefined,
+      TWITCH_CHANNEL: 'test-channel',
+      TWITCH_CHANNEL_ID: undefined,
+      TWITCH_CLIENT_ID: 'test-client-id',
+      TWITCH_CLIENT_SECRET: undefined,
+      TWITCH_HIGHLIGHT_REWARD_ID: undefined,
+      TWITCH_TOKEN_FILE: tokenFile
+    }, async () => {
+      const queued = []
+      let chatMessageHandler = null
+      const chat = createChatService({
+        actionQueue: {
+          enqueue(item) {
+            queued.push(item)
+            return { queued: true }
+          }
+        },
+        actions: {},
+        logger: { error() {}, log() {}, warn() {} },
+        twurpleLoader: async () => createTwurpleStub({
+          async getTokenInfo() {
+            return { scopes: [], userId: 'bot-123' }
+          },
+          onChatMessage({ handler }) {
+            chatMessageHandler = handler
+          }
+        })
+      })
+
+      try {
+        await chat.start()
+        assert.equal(typeof chatMessageHandler, 'function')
+        await fn({
+          chat,
+          queued,
+          sendMessage(event) {
+            chatMessageHandler(event)
+          }
+        })
+      } finally {
+        chat.stop()
+      }
+    })
+  })
+}
+
+test('chat commands enqueue configured actions with alias and argument context', async () => {
+  const actions = [{ type: 'overlay.alert', message: '{after}' }]
+
+  await withChatCommandHarness([
+    {
+      actions,
+      aliases: ['!say'],
+      command: '!announce',
+      cooldownSeconds: 60,
+      roles: ['mod']
+    }
+  ], async ({ chat, queued, sendMessage }) => {
+    sendMessage(createChatMessage({
+      badges: { moderator: '1' },
+      displayName: 'Moderator',
+      message: '!SAY  hello   world',
+      userId: 'moderator-1',
+      username: 'moderator'
+    }))
+
+    await waitFor(() => queued.length === 1)
+
+    sendMessage(createChatMessage({
+      badges: { moderator: '1' },
+      displayName: 'Moderator',
+      message: '!announce another message',
+      userId: 'moderator-1',
+      username: 'moderator'
+    }))
+    await waitFor(() => chat.getStatus().messageCount === 2)
+    assert.equal(queued.length, 1)
+
+    const [queueItem] = queued
+    assert.deepEqual(queueItem.actions, actions)
+    assert.equal(queueItem.name, 'Twitch Command !say')
+    assert.equal(queueItem.source, 'chat')
+    assert.deepEqual({
+      after: queueItem.context.after,
+      args: queueItem.context.args,
+      command: queueItem.context.command,
+      commandName: queueItem.context.commandName,
+      displayName: queueItem.context.displayName,
+      roles: queueItem.context.roles,
+      source: queueItem.context.source,
+      userId: queueItem.context.userId
+    }, {
+      after: 'hello   world',
+      args: ['hello', 'world'],
+      command: '!say',
+      commandName: '!say',
+      displayName: 'Moderator',
+      roles: ['everyone', 'moderator'],
+      source: 'chat',
+      userId: 'moderator-1'
+    })
+    assert.deepEqual({
+      after: queueItem.context.chat.after,
+      args: queueItem.context.chat.args,
+      command: queueItem.context.chat.command,
+      roles: queueItem.context.chat.roles
+    }, {
+      after: 'hello   world',
+      args: ['hello', 'world'],
+      command: '!say',
+      roles: ['everyone', 'moderator']
+    })
+  })
+})
+
+test('chat commands reject users without an allowed role', async () => {
+  await withChatCommandHarness([
+    {
+      actions: [{ type: 'overlay.alert', message: 'Restricted' }],
+      command: '!restricted',
+      roles: ['moderator']
+    }
+  ], async ({ chat, queued, sendMessage }) => {
+    sendMessage(createChatMessage({ message: '!restricted' }))
+
+    await waitFor(() => chat.getStatus().messageCount === 1)
+
+    assert.deepEqual(queued, [])
+  })
+})
+
+test('chat command cooldowns apply globally or per user as configured', async () => {
+  await withChatCommandHarness([
+    {
+      actions: [{ type: 'overlay.alert', message: 'Global' }],
+      command: '!global',
+      cooldownSeconds: 60,
+      roles: ['everyone']
+    },
+    {
+      actions: [{ type: 'overlay.alert', message: 'User' }],
+      command: '!user',
+      cooldownScope: 'user',
+      cooldownSeconds: 60,
+      roles: ['everyone']
+    }
+  ], async ({ queued, sendMessage }) => {
+    sendMessage(createChatMessage({ message: '!global', userId: 'viewer-1' }))
+    sendMessage(createChatMessage({ message: '!global', userId: 'viewer-2' }))
+    sendMessage(createChatMessage({ message: '!user', userId: 'viewer-1' }))
+    sendMessage(createChatMessage({ message: '!user', userId: 'viewer-1' }))
+    sendMessage(createChatMessage({ message: '!user', userId: 'viewer-2' }))
+
+    await waitFor(() => queued.length === 3)
+
+    assert.deepEqual(queued.map(item => ({
+      name: item.name,
+      userId: item.context.userId
+    })), [
+      { name: 'Twitch Command !global', userId: 'viewer-1' },
+      { name: 'Twitch Command !user', userId: 'viewer-1' },
+      { name: 'Twitch Command !user', userId: 'viewer-2' }
+    ])
+  })
+})
 
 test('configured EventSub handler groups match restart-warning group names', () => {
   const groups = getConfiguredEventSubHandlerGroups({
