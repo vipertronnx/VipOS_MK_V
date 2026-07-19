@@ -39,6 +39,7 @@ const {
   normalizeEventName,
   normalizeMatchValue
 } = require('./chat-normalization')
+const { createRetryScheduler } = require('./chat-retry')
 
 const DEFAULT_COMMAND_PREFIX = '!'
 const DEFAULT_COMMANDS_FILE = path.join(__dirname, '..', '..', 'config', 'commands.json')
@@ -65,10 +66,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   let raidHandlers = []
   let redemptionHandlers = []
   let redemptionUpdateHandlers = []
-  let rewardRetryAttempt = 0
-  let rewardRetryTimer = null
-  let retryAttempt = 0
-  let retryTimer = null
   let rewardEventHandlers = []
   let subscriptionHandlers = []
   let subscribedEventSubHandlerGroups = new Set()
@@ -135,6 +132,36 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     tokenFile: relativeAppPath(config.tokenFile)
   }
 
+  const startupRetry = createRetryScheduler({
+    initialMs: config.reconnectInitialMs,
+    maxMs: config.reconnectMaxMs,
+    onSchedule({ attempt, delay }) {
+      state.retryAttempt = attempt
+      state.nextRetryAt = new Date(Date.now() + delay).toISOString()
+      logger.warn(`Retrying Twitch chat startup in ${Math.round(delay / 1000)}s`)
+    },
+    onRetry: start,
+    onReset() {
+      state.retryAttempt = 0
+      state.nextRetryAt = null
+    }
+  })
+
+  const rewardRetry = createRetryScheduler({
+    initialMs: config.reconnectInitialMs,
+    maxMs: config.reconnectMaxMs,
+    onSchedule({ attempt, delay }) {
+      state.rewardsRetryAttempt = attempt
+      state.rewardsNextRetryAt = new Date(Date.now() + delay).toISOString()
+      logger.warn(`Retrying Twitch reward subscription in ${Math.round(delay / 1000)}s`)
+    },
+    onRetry: retryRewardSubscriptions,
+    onReset() {
+      state.rewardsRetryAttempt = 0
+      state.rewardsNextRetryAt = null
+    }
+  })
+
   async function start() {
     shouldRun = true
 
@@ -199,7 +226,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       started = true
       state.started = true
       state.lastError = null
-      resetRetry()
+      startupRetry.reset()
       await notifyReady()
       logger.log(`Twitch chat listener starting for #${state.broadcasterName} as ${state.botUserName}`)
     } catch (error) {
@@ -216,7 +243,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
 
   function stop() {
     shouldRun = false
-    resetRetry()
+    startupRetry.reset()
     cleanupListener()
     unwatchCommands()
   }
@@ -227,7 +254,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     started = false
     state.started = false
     state.connected = false
-    resetRewardRetry()
+    rewardRetry.reset()
     rewardSubscriptionRegistrars = new Map()
     rewardSubscriptionRetryQueue = new Map()
   }
@@ -235,34 +262,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
   function scheduleRetry() {
     if (!state.enabled) return
     if (!shouldRun) return
-    if (retryTimer) return
-
-    retryAttempt += 1
-    const delay = Math.min(
-      config.reconnectInitialMs * Math.pow(2, retryAttempt - 1),
-      config.reconnectMaxMs
-    )
-
-    state.retryAttempt = retryAttempt
-    state.nextRetryAt = new Date(Date.now() + delay).toISOString()
-    logger.warn(`Retrying Twitch chat startup in ${Math.round(delay / 1000)}s`)
-
-    retryTimer = setTimeout(() => {
-      retryTimer = null
-      start()
-    }, delay)
-  }
-
-  function resetRetry() {
-    retryAttempt = 0
-    state.retryAttempt = 0
-    state.nextRetryAt = null
-    clearRetry()
-  }
-
-  function clearRetry() {
-    if (retryTimer) clearTimeout(retryTimer)
-    retryTimer = null
+    startupRetry.schedule()
   }
 
   async function notifyReady() {
@@ -347,10 +347,8 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
       if (isRewardSubscription(subscription)) {
         rewardSubscriptionRetryQueue.delete(subscription.id)
         state.rewardsLastError = null
-        if (!rewardSubscriptionRetryQueue.size && !rewardRetryTimer) {
-          rewardRetryAttempt = 0
-          state.rewardsRetryAttempt = 0
-          state.rewardsNextRetryAt = null
+        if (!rewardSubscriptionRetryQueue.size && !rewardRetry.isScheduled()) {
+          rewardRetry.reset()
         }
       }
     })
@@ -501,22 +499,7 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
     if (!register) return
 
     rewardSubscriptionRetryQueue.set(subscription.id, register)
-    if (rewardRetryTimer) return
-
-    rewardRetryAttempt += 1
-    const delay = Math.min(
-      config.reconnectInitialMs * Math.pow(2, rewardRetryAttempt - 1),
-      config.reconnectMaxMs
-    )
-
-    state.rewardsRetryAttempt = rewardRetryAttempt
-    state.rewardsNextRetryAt = new Date(Date.now() + delay).toISOString()
-    logger.warn(`Retrying Twitch reward subscription in ${Math.round(delay / 1000)}s`)
-
-    rewardRetryTimer = setTimeout(() => {
-      rewardRetryTimer = null
-      retryRewardSubscriptions()
-    }, delay)
+    rewardRetry.schedule()
   }
 
   function retryRewardSubscriptions() {
@@ -534,14 +517,6 @@ function createChatService({ actions, actionQueue = null, logger = console, onRe
         logger.error(`Twitch reward subscription retry failed: ${error.message}`)
       }
     }
-  }
-
-  function resetRewardRetry() {
-    if (rewardRetryTimer) clearTimeout(rewardRetryTimer)
-    rewardRetryTimer = null
-    rewardRetryAttempt = 0
-    state.rewardsRetryAttempt = 0
-    state.rewardsNextRetryAt = null
   }
 
   async function handleMessage(event) {
