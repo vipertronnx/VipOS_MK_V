@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { userInputError } = require('../utils/errors')
 const { createPersistenceError, writeJsonFile } = require('../utils/json-file')
+const { relativeAppPath } = require('../utils/app-path')
 
 const DEFAULT_GREETINGS_FILE = path.join(__dirname, '..', '..', 'config', 'greetings.json')
 const DEFAULT_GREETINGS_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'examples', 'greetings.example.json')
@@ -20,13 +21,13 @@ function createGreetingService({
 
     return {
       activePool,
-      file: relativePath(greetingsFile),
+      file: relativeAppPath(greetingsFile),
       pools: Object.entries(catalog.pools).map(([name, items]) => ({
         active: name === activePool,
         count: items.length,
         name
       })),
-      settingsFile: relativePath(settingsFile)
+      settingsFile: relativeAppPath(settingsFile)
     }
   }
 
@@ -170,10 +171,6 @@ function resolveConfigJsonPath(value, fallback) {
   }
 
   return resolved
-}
-
-function relativePath(filePath) {
-  return path.relative(path.join(__dirname, '..', '..'), filePath).replace(/\\/g, '/')
 }
 
 module.exports = {

@@ -5,15 +5,17 @@ const path = require('node:path')
 const test = require('node:test')
 
 const {
-  ChatConfigError,
   createChatService,
   getEventSubAuthRequirements,
   getConfiguredEventSubHandlerGroups,
-  getUnsubscribedEventSubHandlerGroups,
+  getUnsubscribedEventSubHandlerGroups
+} = require('../modules/chat/chat')
+const {
+  ChatConfigError,
   isNonRetryableStartupError,
   readTokenConfig,
   TokenConfigError
-} = require('../modules/chat/chat')
+} = require('../modules/chat/chat-auth')
 
 function withTempDirectory(fn) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vipos-chat-'))
