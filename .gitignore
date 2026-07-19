@@ -1,7 +1,8 @@
 .env
 config/auth_notes.txt
 config/*
-!config/*.example.json
+!config/examples/
+!config/examples/*.example.json
 config/*.tmp
 node_modules/*
 TO-DO.md

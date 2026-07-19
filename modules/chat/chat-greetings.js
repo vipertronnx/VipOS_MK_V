@@ -4,7 +4,7 @@ const { userInputError } = require('../utils/errors')
 const { createPersistenceError, writeJsonFile } = require('../utils/json-file')
 
 const DEFAULT_GREETINGS_FILE = path.join(__dirname, '..', '..', 'config', 'greetings.json')
-const DEFAULT_GREETINGS_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'greetings.example.json')
+const DEFAULT_GREETINGS_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'examples', 'greetings.example.json')
 const DEFAULT_SETTINGS_FILE = path.join(__dirname, '..', '..', 'config', 'greetings-settings.json')
 const CONFIG_DIRECTORY = path.join(__dirname, '..', '..', 'config')
 const FALLBACK_POOL = 'all'

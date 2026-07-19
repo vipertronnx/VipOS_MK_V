@@ -7,7 +7,7 @@ const { asArray } = require('../utils/value-normalization')
 
 const DEFAULT_SOUND_DIRECTORY = path.join(__dirname, '..', '..', 'public', 'assets', 'sounds')
 const DEFAULT_SOUND_TEXT_FILE = path.join(__dirname, '..', '..', 'config', 'sfx-text.json')
-const DEFAULT_SOUND_TEXT_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'sfx-text.example.json')
+const DEFAULT_SOUND_TEXT_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'examples', 'sfx-text.example.json')
 const DEFAULT_ALERT_SOUND = 'example.mp3'
 const MAX_ACTION_DELAY_MS = 10 * 60 * 1000
 const SOUND_LIST_CACHE_TTL_MS = 5000
@@ -394,7 +394,7 @@ function getSoundTextExampleFile(file) {
   if (!file) return null
   if (file === DEFAULT_SOUND_TEXT_FILE) return DEFAULT_SOUND_TEXT_EXAMPLE_FILE
   if (path.basename(file) !== 'sfx-text.json') return null
-  return path.join(path.dirname(file), 'sfx-text.example.json')
+  return path.join(path.dirname(file), 'examples', 'sfx-text.example.json')
 }
 
 function normalizeSoundTextMap(value) {

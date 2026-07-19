@@ -316,8 +316,9 @@ test('random sound falls back to example text config when primary config is miss
     const configDirectory = path.join(directory, 'config')
     fs.mkdirSync(soundDirectory)
     fs.mkdirSync(configDirectory)
+    fs.mkdirSync(path.join(configDirectory, 'examples'))
     createTinyWav(path.join(soundDirectory, 'example.wav'))
-    fs.writeFileSync(path.join(configDirectory, 'sfx-text.example.json'), JSON.stringify({
+    fs.writeFileSync(path.join(configDirectory, 'examples', 'sfx-text.example.json'), JSON.stringify({
       'example.wav': 'Example fallback'
     }))
 
@@ -355,12 +356,13 @@ test('random sound uses primary text config when it exists', async () => {
     const configDirectory = path.join(directory, 'config')
     fs.mkdirSync(soundDirectory)
     fs.mkdirSync(configDirectory)
+    fs.mkdirSync(path.join(configDirectory, 'examples'))
     createTinyWav(path.join(soundDirectory, 'primary.wav'))
     createTinyWav(path.join(soundDirectory, 'example.wav'))
     fs.writeFileSync(path.join(configDirectory, 'sfx-text.json'), JSON.stringify({
       'primary.wav': 'Primary config'
     }))
-    fs.writeFileSync(path.join(configDirectory, 'sfx-text.example.json'), JSON.stringify({
+    fs.writeFileSync(path.join(configDirectory, 'examples', 'sfx-text.example.json'), JSON.stringify({
       'example.wav': 'Example fallback'
     }))
 
@@ -386,9 +388,10 @@ test('random sound falls back to example text config when primary config is malf
     const configDirectory = path.join(directory, 'config')
     fs.mkdirSync(soundDirectory)
     fs.mkdirSync(configDirectory)
+    fs.mkdirSync(path.join(configDirectory, 'examples'))
     createTinyWav(path.join(soundDirectory, 'example.wav'))
     fs.writeFileSync(path.join(configDirectory, 'sfx-text.json'), '{not json')
-    fs.writeFileSync(path.join(configDirectory, 'sfx-text.example.json'), JSON.stringify({
+    fs.writeFileSync(path.join(configDirectory, 'examples', 'sfx-text.example.json'), JSON.stringify({
       'example.wav': 'Example fallback'
     }))
 

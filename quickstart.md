@@ -47,7 +47,7 @@ Copy and paste the contents of `.env.example` into a new `.env` file. Replace th
 
 ## Step 4.
 #### Configure your commands, greetings, etc.<br>
-Create new `.json` files in `/config` for commands, greetings, TV Guide settings, etc. You can use the `.example.json` files as templates.
+Create new `.json` files in `/config` for commands, greetings, TV Guide settings, etc. You can use the templates in `/config/examples`.
 
 ## Step 5.
 #### Add Overlay Browser Sources to OBS Scenes<br>

@@ -97,7 +97,7 @@ async function main() {
   }
 
   if (!matchingHistory.length) {
-    console.log('No matching handlers fired. Add a handler to config/commands.json or config/commands.example.json.')
+    console.log('No matching handlers fired. Add a handler to config/commands.json or config/examples/commands.example.json.')
   }
 
   if (emitted.length) {
@@ -196,7 +196,7 @@ function resolveCommandsFile() {
   const configured = path.join(__dirname, '..', 'config', 'commands.json')
   if (fs.existsSync(configured)) return configured
 
-  return path.join(__dirname, '..', 'config', 'commands.example.json')
+  return path.join(__dirname, '..', 'config', 'examples', 'commands.example.json')
 }
 
 function readJson(file) {

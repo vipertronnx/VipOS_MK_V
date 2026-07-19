@@ -27,14 +27,14 @@ const DEFAULT_ALERT_SOUND = process.env.DEFAULT_ALERT_SOUND || 'example.mp3'
 const DEFAULT_SOUND_COMPLETION_DELAY_MS = numberOrDefault(process.env.QUEUE_SOUND_COMPLETION_DELAY_MS, 4000)
 const SOUND_COMPLETION_BUFFER_MS = numberOrDefault(process.env.QUEUE_SOUND_COMPLETION_BUFFER_MS, 250)
 const NEWS_CHYRON_ROTATE_INTERVAL_MS = numberOrDefault(process.env.NEWS_CHYRON_ROTATE_INTERVAL_MS, 30000)
-const NEWS_CHYRON_ITEMS_DEFAULT = process.env.NEWS_CHYRON_ITEMS_DEFAULT || 'config/news-chyron.example.json'
+const NEWS_CHYRON_ITEMS_DEFAULT = process.env.NEWS_CHYRON_ITEMS_DEFAULT || 'config/examples/news-chyron.example.json'
 const NEWS_CHYRON_ITEMS = readNewsChyronItems()
 const LOWER_THIRD_TOGGLE_INTERVAL_MS = numberOrDefault(process.env.LOWER_THIRD_TOGGLE_INTERVAL_MS, 3 * 60 * 1000)
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE, '140px')
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION = cssTimeOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION, '600ms')
 const VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE, '100%')
 const VENOM_COIN_LOWER_THIRD_SLIDE_DURATION = cssTimeOrDefault(process.env.VENOM_COIN_LOWER_THIRD_SLIDE_DURATION, '300ms')
-const TV_GUIDE_ITEMS_DEFAULT = process.env.TV_GUIDE_ITEMS_DEFAULT || 'config/tv-guide.example.json'
+const TV_GUIDE_ITEMS_DEFAULT = process.env.TV_GUIDE_ITEMS_DEFAULT || 'config/examples/tv-guide.example.json'
 const TV_GUIDE_ITEMS = readTvGuideItems()
 
 function createSocketServer(server, { port = PORT, portContext = createPortContext(port) } = {}) {

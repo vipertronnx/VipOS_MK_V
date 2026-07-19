@@ -601,7 +601,8 @@ test('/api/v1/sound-random uses the example text config when primary config is m
   await withTempDirectory(async directory => {
     const configDirectory = path.join(directory, 'config')
     fs.mkdirSync(configDirectory)
-    fs.writeFileSync(path.join(configDirectory, 'sfx-text.example.json'), JSON.stringify({
+    fs.mkdirSync(path.join(configDirectory, 'examples'))
+    fs.writeFileSync(path.join(configDirectory, 'examples', 'sfx-text.example.json'), JSON.stringify({
       'example.mp3': 'Example route sound'
     }))
 

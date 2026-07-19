@@ -28,12 +28,12 @@ Font binaries remain intentionally untracked. Obtain the Orbitron webfonts from 
 ## News Chyron
 The news chyron rotates its `h1`, `h2`, and `h3` text at random. Set `NEWS_CHYRON_ROTATE_INTERVAL_MS=30000` in `.env` to change the timer.
 
-By default, the text pool is loaded from `NEWS_CHYRON_ITEMS_DEFAULT`, which points to `config/news-chyron.example.json` unless overridden.
+By default, the text pool is loaded from `NEWS_CHYRON_ITEMS_DEFAULT`, which points to `config/examples/news-chyron.example.json` unless overridden.
 
-To replace the default text pool, copy `config/news-chyron.example.json` to `config/news-chyron.json`, edit the entries, and uncomment `NEWS_CHYRON_ITEMS`:
+To replace the default text pool, copy `config/examples/news-chyron.example.json` to `config/news-chyron.json`, edit the entries, and uncomment `NEWS_CHYRON_ITEMS`:
 
 ```env
-NEWS_CHYRON_ITEMS_DEFAULT=config/news-chyron.example.json
+NEWS_CHYRON_ITEMS_DEFAULT=config/examples/news-chyron.example.json
 # NEWS_CHYRON_ITEMS=config/news-chyron.json
 ```
 
@@ -51,7 +51,7 @@ LOWER_THIRD_TOGGLE_INTERVAL_MS=180000
 ## Control Panel
 The control panel includes configured macro buttons, action queue controls, OBS scene/source/input discovery, manual overlay controls, chat messages, and the raw action runner.
 
-Copy `config/macros.example.json` to `config/macros.json` and edit the production macros for your stream. Each macro has an `id`, `name`, optional `description`, and `actions`.
+Copy `config/examples/macros.example.json` to `config/macros.json` and edit the production macros for your stream. Each macro has an `id`, `name`, optional `description`, and `actions`.
 
 The Sound control searches local `.mp3`, `.ogg`, and `.wav` files under `public/assets/sounds`, including subdirectories, and shows detected duration labels from `GET /api/v1/sounds`. Sound listings are cached briefly; use the Sound panel refresh button or `GET /api/v1/sounds?refresh=1` to force a fresh directory scan.
 
@@ -70,7 +70,7 @@ The raffle system can be turned on or off from the control panel, or with:
 
 When turned on, the raffle system opens the first raffle immediately. After a raffle closes, the next raffle opens at a random time between `settings.minDelayMs` and `settings.maxDelayMs`, defaulting to 5-10 minutes. Each raffle randomly picks its prize from `settings.pointAmounts`, defaulting to `[100,150,200,250,300,350,400,450,500]`, and announces the amount with `settings.pointName`, such as `cassette tapes` or `viperbucks`. Set `settings.pointTwitchEmoji` to append a Twitch emoji code to raffle chat messages. An open raffle announces in chat and on the alert overlay, plays `settings.alertSound` when configured, then posts the remaining seconds to chat every `settings.countdownIntervalMs`, defaulting to 30 seconds. Set it to `20000` for 20-second updates. Viewers enter with `settings.entryCommand`; duplicate entries are ignored for the active round. Viewers can check their accumulated raffle points with `settings.pointsCommand`.
 
-Raffle state and detailed raffle settings are persisted in `config/raffle.json`, including users who entered raffles, winners, total wins, total entries, and accumulated points. Copy `config/raffle.example.json` to `config/raffle.json` to customize raffle behavior. `.env` only needs `RAFFLE_ENABLED` for the default startup toggle; advanced `RAFFLE_*` environment values are still supported as deployment overrides and take precedence over matching JSON settings when present.
+Raffle state and detailed raffle settings are persisted in `config/raffle.json`, including users who entered raffles, winners, total wins, total entries, and accumulated points. Copy `config/examples/raffle.example.json` to `config/raffle.json` to customize raffle behavior. `.env` only needs `RAFFLE_ENABLED` for the default startup toggle; advanced `RAFFLE_*` environment values are still supported as deployment overrides and take precedence over matching JSON settings when present.
 
 Use `POST /api/v1/actions/enqueue` to queue custom actions. Use `POST /api/v1/actions/run` only when you intentionally need to bypass the queue and run actions immediately.
 
@@ -79,7 +79,7 @@ Queued sound actions use the local audio file duration to keep the item running 
 OBS dropdowns are populated from the live OBS WebSocket connection. If OBS is not connected, the controls stay disabled until OBS discovery succeeds.
 
 ## Chat Commands
-Copy `config/commands.example.json` to `config/commands.json` and edit the commands/actions for your stream.
+Copy `config/examples/commands.example.json` to `config/commands.json` and edit the commands/actions for your stream.
 The commands file is watched and reloaded while the app is running.
 
 Chat uses Twitch EventSub WebSockets for inbound messages and the Twitch Send Chat Message API for bot replies. Authorize the bot account with:
@@ -143,7 +143,7 @@ npm run simulate:twitch-event -- sub --live
 npm run simulate:twitch-event -- gift-sub --count 5 --live
 ```
 
-The simulator uses `config/commands.json` when present, otherwise `config/commands.example.json`. Pass a custom fixture path after the event type to override the default payload. Use `--url http://127.0.0.1:5000` if the app is running on a different local URL.
+The simulator uses `config/commands.json` when present, otherwise `config/examples/commands.example.json`. Pass a custom fixture path after the event type to override the default payload. Use `--url http://127.0.0.1:5000` if the app is running on a different local URL.
 
 Redemption handlers can be catch-all, or they can include a `match` object:
 
@@ -194,5 +194,5 @@ Action types currently supported:
 - `log`
 
 `overlay.alert` plays `DEFAULT_ALERT_SOUND` by default unless the action includes `sound: false`, a custom `sound`/`soundSrc`, or the same action list already includes a separate `sound.play` or `sound.pickRandom` action.
-`sound.pickRandom` chooses from top-level `.mp3`, `.ogg`, and `.wav` files in `public/assets/sounds` only when their filenames are listed in `config/sfx-text.json`; if that file is absent, it falls back to `config/sfx-text.example.json`. Subdirectories are ignored. Edit `config/sfx-text.json` to control both the random SFX pool and the overlay text for each filename.
+`sound.pickRandom` chooses from top-level `.mp3`, `.ogg`, and `.wav` files in `public/assets/sounds` only when their filenames are listed in `config/sfx-text.json`; if that file is absent, it falls back to `config/examples/sfx-text.example.json`. Subdirectories are ignored. Edit `config/sfx-text.json` to control both the random SFX pool and the overlay text for each filename.
 Edit `config/greetings.json` to control the themed text pools used by `context.pickRandom`. The control panel can switch the active greeting theme, which is saved in `config/greetings-settings.json`.
