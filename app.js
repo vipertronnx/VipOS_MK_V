@@ -822,10 +822,7 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
   }))
 
   app.post('/api/v1/bg-alert', asyncHandler(async (req, res) => {
-    enqueueApiActions(res, 'Border Alert', [
-      { type: 'overlay.emit', event: 'bg-alert' },
-      { type: 'sound.play', src: DEFAULT_ALERT_SOUND, volume: 1 }
-    ], {
+    enqueueApiActions(res, 'Border Alert', [{ type: 'border.alert' }], {
       completionDelayMs: getRequestCompletionDelay(req),
       fallbackCompletionDelayMs: DEFAULT_SOUND_COMPLETION_DELAY_MS
     })

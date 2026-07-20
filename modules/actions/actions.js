@@ -29,6 +29,7 @@ const ACTION_DEFINITIONS = {
   'obs.mute': { execute: executeObsMute, requiredFields: [['input', 'source']] },
   'obs.scene': { execute: executeObsScene, requiredFields: [['scene']] },
   'obs.source': { execute: executeObsSource, requiredFields: [['source', 'input']] },
+  'border.alert': { execute: executeBorderAlert, quietable: true, requiredFields: [] },
   'chyron.alert': { execute: executeChyronAlert, quietable: true, requiredFields: [['h1'], ['h2'], ['h3']] },
   'overlay.alert': { execute: executeOverlayAlert, quietable: true, requiredFields: [['message']] },
   'overlay.emit': { execute: executeOverlayEmit, quietable: true, requiredFields: [['event']] },
@@ -275,8 +276,23 @@ function executeOverlayAlert(action, context, options, runtime) {
   if (!message) throw new Error('overlay.alert requires a message')
   if (action.background !== false) runtime.io.emit('bg-alert')
   runtime.io.emit('text-alert', { message })
-  const soundResult = maybePlayAlertSound(action, context, options, runtime)
+  const soundResult = maybePlayAlertSound(action, context, options, runtime, 'overlay.alert')
   return soundResult ? { type: 'overlay.alert', message, sound: soundResult } : { type: 'overlay.alert', message }
+}
+
+/**
+ * Triggers the animated stream border without emitting alert text.
+ *
+ * @param {object} action Configured sound options.
+ * @param {object} context Values available to action placeholders.
+ * @param {object} options Action-runner options including explicit sound detection.
+ * @param {object} runtime Runtime Socket.IO dependencies.
+ * @returns {object} Emitted border alert data and its optional implicit sound result.
+ */
+function executeBorderAlert(action, context, options, runtime) {
+  runtime.overlayEmit('bg-alert')
+  const soundResult = maybePlayAlertSound(action, context, options, runtime, 'border.alert')
+  return soundResult ? { type: 'border.alert', sound: soundResult } : { type: 'border.alert' }
 }
 
 /**
@@ -341,7 +357,7 @@ function executeSoundPlay(action, context, options, runtime) {
   return { type: 'sound.play', src, volume, durationMs }
 }
 
-function maybePlayAlertSound(action, context, { hasExplicitSoundAction = false } = {}, runtime) {
+function maybePlayAlertSound(action, context, { hasExplicitSoundAction = false } = {}, runtime, source = 'overlay.alert') {
   if (action.sound === false || action.playSound === false) return null
   if (hasExplicitSoundAction && action.sound === undefined && action.soundSrc === undefined && action.src === undefined) return null
 
@@ -355,7 +371,7 @@ function maybePlayAlertSound(action, context, { hasExplicitSoundAction = false }
   const volume = clamp(Number(action.volume ?? 1), 0, 1)
   const durationMs = getSoundDurationMs(src, runtime.soundDirectory, runtime.logger, runtime.largeSoundWarningBytes)
   runtime.io.emit('sound-play', { src, volume })
-  return { type: 'sound.play', src, volume, durationMs, source: 'overlay.alert' }
+  return { type: 'sound.play', src, volume, durationMs, source }
 }
 
 /**

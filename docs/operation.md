@@ -56,7 +56,7 @@ Use `POST /api/v1/actions/enqueue` for normal custom sequences. `POST /api/v1/ac
 
 ## Quiet Mode
 
-Quiet Mode suppresses viewer-triggered `chyron.alert`, `overlay.alert`, `overlay.emit`, `sound.pickRandom`, and `sound.play` actions. It applies to chat, chat entries, Twitch events, redemptions, and reward events. Manual API and macro actions remain available.
+Quiet Mode suppresses viewer-triggered `border.alert`, `chyron.alert`, `overlay.alert`, `overlay.emit`, `sound.pickRandom`, and `sound.play` actions. It applies to chat, chat entries, Twitch events, redemptions, and reward events. Manual API and macro actions remain available.
 
 Use the control panel or:
 

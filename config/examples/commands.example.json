@@ -26,6 +26,14 @@
       ]
     },
     {
+      "command": "!border-alert",
+      "roles": ["broadcaster", "mod"],
+      "cooldownSeconds": 5,
+      "actions": [
+        { "type": "border.alert" }
+      ]
+    },
+    {
       "command": "!brb",
       "roles": ["broadcaster", "mod"],
       "cooldownSeconds": 10,

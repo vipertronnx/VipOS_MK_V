@@ -85,6 +85,7 @@ test('action structure validation accepts every supported action type', () => {
     { type: 'obs.mute', input: 'Music' },
     { type: 'obs.scene', scene: 'Live' },
     { type: 'obs.source', source: 'Camera' },
+    { type: 'border.alert' },
     { type: 'chyron.alert', h1: 'Headline', h2: 'Subhead', h3: 'Title' },
     { type: 'overlay.alert', message: '{displayName} joined' },
     { type: 'overlay.emit', event: 'bg-alert' },
@@ -198,6 +199,7 @@ test('action definitions execute every supported action type', async () => {
       { type: 'obs.scene', scene: 'Live' },
       { type: 'obs.source', scene: 'Live', source: 'Camera', visible: true },
       { type: 'overlay.alert', message: '{greeting} alert', sound: false },
+      { type: 'border.alert', sound: false },
       { type: 'overlay.emit', event: 'custom-alert', payload: { greeting: '{greeting}' } },
       { type: 'sound.pickRandom', contextKey: 'sfx', textMap: { 'alert.wav': 'Alert sound' } },
       { type: 'sound.play', src: '{sfx.src}' }
@@ -213,6 +215,7 @@ test('action definitions execute every supported action type', async () => {
       'obs.scene',
       'obs.source',
       'overlay.alert',
+      'border.alert',
       'overlay.emit',
       'sound.pickRandom',
       'sound.play'
@@ -230,6 +233,7 @@ test('action definitions execute every supported action type', async () => {
     assert.deepEqual(emitted, [
       { event: 'bg-alert', payload: undefined },
       { event: 'text-alert', payload: { message: 'Hello alert' } },
+      { event: 'bg-alert', payload: undefined },
       { event: 'custom-alert', payload: { greeting: 'Hello' } },
       { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } }
     ])
@@ -269,6 +273,7 @@ test('quiet mode suppresses the action definitions marked as quietable', async (
   })
 
   const results = await actions.run([
+    { type: 'border.alert' },
     { type: 'chyron.alert', h1: 'Quiet', h2: 'Alert', h3: 'Chyron' },
     { type: 'overlay.alert', message: 'Quiet alert' },
     { type: 'overlay.emit', event: 'quiet-event' },
@@ -277,14 +282,15 @@ test('quiet mode suppresses the action definitions marked as quietable', async (
     { type: 'log', message: 'Still logged' }
   ], { source: 'chat' })
 
-  assert.deepEqual(results.slice(0, 5), [
+  assert.deepEqual(results.slice(0, 6), [
+    { type: 'border.alert', suppressed: true, reason: 'quiet-mode' },
     { type: 'chyron.alert', suppressed: true, reason: 'quiet-mode' },
     { type: 'overlay.alert', suppressed: true, reason: 'quiet-mode' },
     { type: 'overlay.emit', suppressed: true, reason: 'quiet-mode' },
     { type: 'sound.pickRandom', suppressed: true, reason: 'quiet-mode' },
     { type: 'sound.play', suppressed: true, reason: 'quiet-mode' }
   ])
-  assert.deepEqual(results[5], { type: 'log', message: 'Still logged' })
+  assert.deepEqual(results[6], { type: 'log', message: 'Still logged' })
   assert.deepEqual(emitted, [])
   assert.deepEqual(logs, ['Still logged'])
 })
@@ -356,6 +362,74 @@ test('explicit sound action definitions suppress an alert default sound', async 
     assert.deepEqual(emitted, [
       { event: 'bg-alert', payload: undefined },
       { event: 'text-alert', payload: { message: 'Alert' } },
+      { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } }
+    ])
+  })
+})
+
+test('border alerts emit the border event and support implicit sound options', async () => {
+  await withTempSoundDirectory(async soundDirectory => {
+    createTinyWav(path.join(soundDirectory, 'alert.wav'))
+    createTinyWav(path.join(soundDirectory, 'custom.wav'))
+    const emitted = []
+    const actions = createActionRunner({
+      defaultAlertSound: 'alert.wav',
+      io: {
+        emit(event, payload) {
+          emitted.push({ event, payload })
+        }
+      },
+      logger: { error() {}, log() {}, warn() {} },
+      obs: {},
+      soundDirectory
+    })
+
+    const [defaultAlert, silentAlert, customAlert] = await actions.run([
+      { type: 'border.alert' },
+      { type: 'border.alert', sound: false },
+      { type: 'border.alert', sound: 'custom.wav', volume: 0.4 }
+    ])
+
+    assert.equal(defaultAlert.type, 'border.alert')
+    assert.equal(defaultAlert.sound.type, 'sound.play')
+    assert.equal(defaultAlert.sound.src, 'alert.wav')
+    assert.equal(defaultAlert.sound.source, 'border.alert')
+    assert.deepEqual(silentAlert, { type: 'border.alert' })
+    assert.equal(customAlert.sound.src, 'custom.wav')
+    assert.equal(customAlert.sound.volume, 0.4)
+    assert.deepEqual(emitted, [
+      { event: 'bg-alert', payload: undefined },
+      { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } },
+      { event: 'bg-alert', payload: undefined },
+      { event: 'bg-alert', payload: undefined },
+      { event: 'sound-play', payload: { src: 'custom.wav', volume: 0.4 } }
+    ])
+  })
+})
+
+test('explicit sound action definitions suppress a border alert default sound', async () => {
+  await withTempSoundDirectory(async soundDirectory => {
+    createTinyWav(path.join(soundDirectory, 'alert.wav'))
+    const emitted = []
+    const actions = createActionRunner({
+      defaultAlertSound: 'alert.wav',
+      io: {
+        emit(event, payload) {
+          emitted.push({ event, payload })
+        }
+      },
+      logger: { error() {}, log() {}, warn() {} },
+      obs: {},
+      soundDirectory
+    })
+
+    await actions.run([
+      { type: 'border.alert' },
+      { type: 'sound.play', src: 'alert.wav' }
+    ])
+
+    assert.deepEqual(emitted, [
+      { event: 'bg-alert', payload: undefined },
       { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } }
     ])
   })

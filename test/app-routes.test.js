@@ -477,6 +477,28 @@ test('/api/v1/text and /api/v1/alert enqueue equivalent alerts with distinct lab
   ])
 })
 
+test('/api/v1/bg-alert enqueues the semantic border alert action', async () => {
+  const { enqueued, services } = createFakeServices()
+  const app = createApp(services)
+
+  await withTestServer(app, async baseUrl => {
+    const { payload, response } = await postJson(baseUrl, '/api/v1/bg-alert', { completionDelayMs: 125 })
+
+    assert.equal(response.status, 200)
+    assert.equal(payload.ok, true)
+    assert.equal(payload.queued, true)
+  })
+
+  assert.deepEqual(enqueued, [{
+    actions: [{ type: 'border.alert' }],
+    completionDelayMs: 125,
+    context: { source: 'api' },
+    fallbackCompletionDelayMs: 4000,
+    name: 'Border Alert',
+    source: 'api'
+  }])
+})
+
 test('direct and queued actions reject structural errors with HTTP 400', async () => {
   const { services } = createRealQueueServices()
   const app = createApp(services)

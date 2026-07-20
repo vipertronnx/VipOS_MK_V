@@ -166,6 +166,7 @@ Actions are used by macros, Twitch automation, the raffle, and the action API.
 
 | Type | Required fields | Behavior |
 | --- | --- | --- |
+| `border.alert` | None | Triggers the animated stream border without alert text. |
 | `chat.say` | `message` or `text` | Sends a Twitch chat message; `reply: true` replies to the triggering message when an ID is available. |
 | `chyron.alert` | `h1`, `h2`, and `h3` | Makes both shared lower thirds visible, then replaces all news-chyron text. |
 | `context.pickRandom` | `contextKey` or `key` | Stores an inline or configured random text value in the action context. |
@@ -180,7 +181,7 @@ Actions are used by macros, Twitch automation, the raffle, and the action API.
 | `sound.pickRandom` | None | Chooses an eligible sound and stores its metadata at `contextKey`, defaulting to `sfx`. |
 | `sound.play` | `src` or `path` | Plays a local sound at an optional `volume` from `0` to `1`. |
 
-`overlay.alert` uses `DEFAULT_ALERT_SOUND` unless `sound: false` is set, a custom sound is supplied, or the same action list already contains `sound.play` or `sound.pickRandom`.
+`border.alert` and `overlay.alert` use `DEFAULT_ALERT_SOUND` unless `sound: false` is set, a custom sound is supplied, or the same action list already contains `sound.play` or `sound.pickRandom`.
 
 ## Twitch automation
 
