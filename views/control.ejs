@@ -93,12 +93,6 @@
         <button type="button" data-post="/api/v1/test">Test Alert</button>
       </div>
 
-      <div class="button-row">
-        <button type="button" data-post="/api/v1/lower-third/hide">Lower Third Down</button>
-        <button type="button" data-post="/api/v1/lower-third/show">Lower Third Up</button>
-        <button type="button" data-post="/api/v1/lower-third/toggle">Lower Third Toggle</button>
-      </div>
-
       <form data-json-form data-endpoint="/api/v1/actions/run">
         <label for="overlay-event">Custom overlay event</label>
         <div class="control-row">
@@ -108,6 +102,21 @@
           <button type="submit">Emit</button>
         </div>
       </form>
+    </section>
+
+    <section class="control-section control-section--wide">
+      <div class="section-heading">
+        <div>
+          <h2>News Chyron</h2>
+          <p>Show, hide, or toggle the news chyron + venom coin.</p>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button type="button" data-post="/api/v1/lower-third/hide">News Chyron Down</button>
+        <button type="button" data-post="/api/v1/lower-third/show">News Chyron Up</button>
+        <button type="button" data-post="/api/v1/lower-third/toggle">News Chyron Toggle</button>
+      </div>
     </section>
 
     <section class="control-section">
@@ -257,11 +266,24 @@
       <div class="section-heading">
         <div>
           <h2>Status Details</h2>
-          <p>Live state from OBS, chat, rewards, command loading, and socket clients.</p>
+          <p>Live state from OBS, chat, rewards, and command loading.</p>
         </div>
       </div>
       <div class="status-grid" data-status-details>
         <div class="status-item">Loading status...</div>
+      </div>
+    </section>
+
+    <section class="control-section control-section--wide">
+      <div class="section-heading">
+        <div>
+          <h2>Sockets</h2>
+          <p>Live Socket.IO connections to control and overlay pages.</p>
+        </div>
+        <span class="status-pill" data-socket-count aria-live="polite">Loading</span>
+      </div>
+      <div class="socket-list" data-socket-list>
+        <div class="status-item">Loading sockets...</div>
       </div>
     </section>
   </section>

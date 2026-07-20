@@ -1,6 +1,8 @@
 const log = document.querySelector('#control-log');
 const statusEl = document.querySelector('[data-status]');
 const statusDetailsEl = document.querySelector('[data-status-details]');
+const socketCountEl = document.querySelector('[data-socket-count]');
+const socketListEl = document.querySelector('[data-socket-list]');
 const greetingPoolSelect = document.querySelector('[data-greeting-pool]');
 const greetingPoolForm = document.querySelector('[data-greeting-pool-form]');
 const macroListEl = document.querySelector('[data-macro-list]');
@@ -273,7 +275,6 @@ function renderStatusDetails(data) {
   const obs = data.obs || {};
   const quietMode = data.quietMode || {};
   const raffle = data.raffle || {};
-  const sockets = data.sockets || {};
   const items = [
     ['OBS enabled', formatStatusValue(obs.enabled)],
     ['OBS connected', formatStatusValue(obs.connected)],
@@ -305,13 +306,48 @@ function renderStatusDetails(data) {
     ['Raffle next', formatDateValue(raffle.nextEventAt)],
     ['Raffle error', formatStatusValue(raffle.lastError)],
     ['Reward error', formatStatusValue(chat.rewardsLastError)],
-    ['Chat error', formatStatusValue(chat.lastError)],
-    ['Socket clients', formatStatusValue(sockets.clients)]
+    ['Chat error', formatStatusValue(chat.lastError)]
   ];
 
   statusDetailsEl.innerHTML = items.map(([label, value]) => (
     `<div class="status-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
   )).join('');
+}
+
+function renderSockets(sockets) {
+  if (!socketListEl || !socketCountEl) return;
+
+  if (!sockets) {
+    socketCountEl.textContent = 'Unavailable';
+    socketListEl.innerHTML = '<div class="socket-list__empty">Socket details unavailable</div>';
+    return;
+  }
+
+  const connections = Array.isArray(sockets.connections) ? sockets.connections : [];
+  const clientCount = Number(sockets.clients || 0);
+  socketCountEl.textContent = `${clientCount} connected`;
+
+  if (!connections.length) {
+    socketListEl.innerHTML = '<div class="socket-list__empty">No connected Socket.IO clients</div>';
+    return;
+  }
+
+  socketListEl.innerHTML = connections.map(connection => `
+    <article class="socket-card">
+      <div class="socket-card__heading">
+        <strong>${escapeHtml(formatStatusValue(connection.page))}</strong>
+        <span class="status-pill is-online">Connected</span>
+      </div>
+      <dl>
+        <div><dt>Socket ID</dt><dd>${escapeHtml(formatStatusValue(connection.id))}</dd></div>
+        <div><dt>Transport</dt><dd>${escapeHtml(formatStatusValue(connection.transport))}</dd></div>
+        <div><dt>Address</dt><dd>${escapeHtml(formatStatusValue(connection.address))}</dd></div>
+        <div><dt>Namespace</dt><dd>${escapeHtml(formatStatusValue(connection.namespace))}</dd></div>
+        <div><dt>Connected</dt><dd>${escapeHtml(formatDateValue(connection.connectedAt))}</dd></div>
+        <div class="socket-card__client"><dt>Client</dt><dd>${escapeHtml(formatStatusValue(connection.userAgent))}</dd></div>
+      </dl>
+    </article>
+  `).join('');
 }
 
 async function refreshGreetings() {
@@ -341,7 +377,7 @@ async function refreshStatus() {
     const chatLabel = data.chat.connected ? 'Chat online' : (data.chat.enabled ? 'Chat offline' : 'Chat disabled');
     const quietMode = data.quietMode || {};
     const raffle = data.raffle || {};
-    const socketCount = data.sockets.clients || 0;
+    const socketCount = data.sockets?.clients || 0;
 
     statusEl.innerHTML = [
       statusBadge(data.obs.identified ? 'OBS online' : 'OBS offline', data.obs.identified),
@@ -351,6 +387,7 @@ async function refreshStatus() {
       `<span class="status-pill">${socketCount} socket${socketCount === 1 ? '' : 's'}</span>`
     ].join('');
     renderStatusDetails(data);
+    renderSockets(data.sockets);
     renderQueue(data.queue);
     renderRaffle(data.raffle);
   } catch (error) {
@@ -358,6 +395,7 @@ async function refreshStatus() {
     if (statusDetailsEl) {
       statusDetailsEl.innerHTML = '<div class="status-item"><span>Status</span><strong>Unavailable</strong></div>';
     }
+    renderSockets(null);
     renderRaffle(null);
   }
 }

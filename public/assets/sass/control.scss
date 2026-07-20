@@ -364,6 +364,80 @@ body.control-page {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+#control-panel .socket-list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#control-panel .socket-list__empty,
+#control-panel .socket-card {
+  background: #101419;
+  border: 1px solid #2b333d;
+  border-radius: 6px;
+}
+
+#control-panel .socket-list__empty {
+  color: #929da9;
+  grid-column: 1 / -1;
+  padding: 16px;
+}
+
+#control-panel .socket-card {
+  min-width: 0;
+  padding: 12px;
+}
+
+#control-panel .socket-card__heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+#control-panel .socket-card__heading > strong {
+  font-size: 15px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#control-panel .socket-card__heading .status-pill {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+#control-panel .socket-card dl {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+#control-panel .socket-card dl > div {
+  min-width: 0;
+}
+
+#control-panel .socket-card dt {
+  color: #929da9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#control-panel .socket-card dd {
+  color: #f7f9fb;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+#control-panel .socket-card .socket-card__client {
+  grid-column: 1 / -1;
+}
+
 #control-panel .status-item {
   background: #101419;
   border: 1px solid #2b333d;
@@ -420,7 +494,8 @@ body.control-page {
   #control-panel .macro-grid,
   #control-panel .queue-board,
   #control-panel .raffle-board,
-  #control-panel .status-grid {
+  #control-panel .status-grid,
+  #control-panel .socket-list {
     grid-template-columns: 1fr;
   }
 
@@ -436,8 +511,13 @@ body.control-page {
 
   #control-panel .control-row,
   #control-panel .button-row,
-  #control-panel .section-heading {
+  #control-panel .section-heading,
+  #control-panel .socket-card__heading {
     flex-direction: column;
+  }
+
+  #control-panel .socket-card__heading {
+    align-items: flex-start;
   }
 
   #control-panel input[type='number'],

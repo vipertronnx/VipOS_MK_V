@@ -63,6 +63,54 @@ function createSocketServer(server, { port = PORT, portContext = createPortConte
 }
 
 /**
+ * Returns serializable details for each connected Socket.IO client.
+ * Engine.IO client IDs are intentionally excluded because Socket.IO treats them as sensitive.
+ *
+ * @param {import('socket.io').Server} io Socket.IO server to inspect.
+ * @returns {Array<object>} Connected clients sorted by connection time and socket ID.
+ */
+function getSocketConnections(io) {
+  const sockets = io?.of?.('/')?.sockets
+  if (!sockets || typeof sockets.values !== 'function') return []
+
+  return Array.from(sockets.values(), socket => {
+    const handshake = socket.handshake || {}
+    const headers = handshake.headers || {}
+    const issuedAt = Number(handshake.issued)
+    const parsedTime = Date.parse(handshake.time)
+    const connectedTimestamp = Number.isFinite(issuedAt) && issuedAt > 0
+      ? issuedAt
+      : parsedTime
+
+    return {
+      id: socket.id || '',
+      namespace: socket.nsp?.name || '/',
+      page: getSocketPage(headers.referer),
+      transport: socket.conn?.transport?.name || 'unknown',
+      address: handshake.address || socket.conn?.remoteAddress || 'unknown',
+      connectedAt: Number.isFinite(connectedTimestamp)
+        ? new Date(connectedTimestamp).toISOString()
+        : null,
+      userAgent: headers['user-agent'] || 'unknown'
+    }
+  }).sort((left, right) => (
+    String(left.connectedAt || '').localeCompare(String(right.connectedAt || ''))
+      || String(left.id).localeCompare(String(right.id))
+  ))
+}
+
+function getSocketPage(referer) {
+  if (!referer) return 'Unknown page'
+
+  try {
+    const url = new URL(referer)
+    return `${url.pathname}${url.search}` || '/'
+  } catch (error) {
+    return String(referer)
+  }
+}
+
+/**
  * Wires the application services around a shared Socket.IO instance.
  *
  * @param {object} dependencies Runtime dependencies.
@@ -682,6 +730,8 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
    *
    */
   app.get('/api/v1/status', (req, res) => {
+    const socketConnections = getSocketConnections(io)
+
     res.json({
       app: {
         name: APP_NAME,
@@ -696,7 +746,8 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
       queue: actionQueue.getStatus(),
       raffle: raffle.getStatus(),
       sockets: {
-        clients: io.engine.clientsCount
+        clients: socketConnections.length,
+        connections: socketConnections
       }
     })
   })

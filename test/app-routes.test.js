@@ -570,6 +570,49 @@ test('configured application port controls status and local-origin checks', asyn
   })
 })
 
+test('status counts only connected Socket.IO clients and reports their details', async () => {
+  const { services } = createFakeServices()
+  const connectedAt = Date.UTC(2026, 6, 19, 12, 30, 0)
+  // One Engine.IO transport has not joined a Socket.IO namespace yet.
+  services.io.engine.clientsCount = 2
+  services.io.of = () => ({
+    sockets: new Map([['socket-1', {
+      conn: {
+        remoteAddress: '127.0.0.1',
+        transport: { name: 'websocket' }
+      },
+      handshake: {
+        address: '::1',
+        headers: {
+          referer: 'http://localhost:5000/overlay/news-chyron?preview=1',
+          'user-agent': 'Test Browser'
+        },
+        issued: connectedAt
+      },
+      id: 'socket-1',
+      nsp: { name: '/' }
+    }]])
+  })
+  const app = createApp(services)
+
+  await withTestServer(app, async baseUrl => {
+    const response = await fetch(`${baseUrl}/api/v1/status`)
+    const status = await response.json()
+
+    assert.equal(response.status, 200)
+    assert.equal(status.sockets.clients, 1)
+    assert.deepEqual(status.sockets.connections, [{
+      address: '::1',
+      connectedAt: '2026-07-19T12:30:00.000Z',
+      id: 'socket-1',
+      namespace: '/',
+      page: '/overlay/news-chyron?preview=1',
+      transport: 'websocket',
+      userAgent: 'Test Browser'
+    }])
+  })
+})
+
 test('startServer reports and authorizes its dynamically assigned port', async () => {
   const { server, services, stop } = startServer({
     createServices: createStartServerServices,
