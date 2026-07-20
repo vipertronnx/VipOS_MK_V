@@ -14,17 +14,19 @@ const FALLBACK_POOL = 'all'
  * Creates a greeting-pool service backed by JSON configuration and persisted active-pool settings.
  *
  * @param {object} [options] File locations and logging dependency.
+ * @param {Function} [options.catalogExampleFileResolver=getCatalogExampleFile] Resolves tracked fallback catalogs for missing local files.
  * @param {string} [options.greetingsFile] JSON catalog containing named greeting pools.
  * @param {string} [options.settingsFile] JSON file used to persist the selected pool.
  * @returns {object} Operations for listing pool status, selecting a greeting, and updating the active pool.
  */
 function createGreetingService({
+  catalogExampleFileResolver = getCatalogExampleFile,
   greetingsFile = DEFAULT_GREETINGS_FILE,
   settingsFile = DEFAULT_SETTINGS_FILE,
   logger = console
 } = {}) {
   function getStatus() {
-    const catalog = loadCatalog(greetingsFile, logger)
+    const catalog = loadCatalog(greetingsFile, logger, catalogExampleFileResolver)
     const activePool = resolveActivePool(catalog)
 
     return {
@@ -50,7 +52,7 @@ function createGreetingService({
    */
   function pick(options = {}) {
     const file = resolveConfigJsonPath(options.file, greetingsFile)
-    const catalog = loadCatalog(file, logger)
+    const catalog = loadCatalog(file, logger, catalogExampleFileResolver)
     const pool = resolvePool(catalog, options.pool || (!options.file ? readSettings().activePool : null), {
       strict: Boolean(options.pool)
     })
@@ -67,7 +69,7 @@ function createGreetingService({
   }
 
   function setActivePool(poolName) {
-    const catalog = loadCatalog(greetingsFile, logger)
+    const catalog = loadCatalog(greetingsFile, logger, catalogExampleFileResolver)
     const activePool = resolvePool(catalog, poolName, { strict: true })
 
     try {
@@ -105,16 +107,18 @@ function createGreetingService({
 }
 
 /**
- * Loads and normalizes a greeting catalog. A missing primary catalog uses the example when available; other missing or unreadable sources produce an empty default pool.
+ * Loads and normalizes a greeting catalog. A missing catalog uses its matching tracked example when available; other missing or unreadable sources produce an empty default pool.
  *
  * @param {string} file Catalog file to read.
  * @param {object} [logger=console] Logger exposing `warn` for read or parse failures.
+ * @param {Function} [catalogExampleFileResolver=getCatalogExampleFile] Resolves a tracked fallback catalog for a missing source.
  * @returns {{defaultPool: string, pools: Record<string, string[]>}} Normalized catalog.
  */
-function loadCatalog(file, logger = console) {
+function loadCatalog(file, logger = console, catalogExampleFileResolver = getCatalogExampleFile) {
   if (!file || !fs.existsSync(file)) {
-    if (file === DEFAULT_GREETINGS_FILE && fs.existsSync(DEFAULT_GREETINGS_EXAMPLE_FILE)) {
-      return loadCatalog(DEFAULT_GREETINGS_EXAMPLE_FILE, logger)
+    const exampleFile = catalogExampleFileResolver(file)
+    if (exampleFile && exampleFile !== file && fs.existsSync(exampleFile)) {
+      return loadCatalog(exampleFile, logger, catalogExampleFileResolver)
     }
     return { defaultPool: FALLBACK_POOL, pools: { [FALLBACK_POOL]: [] } }
   }
@@ -127,6 +131,24 @@ function loadCatalog(file, logger = console) {
     }
     return { defaultPool: FALLBACK_POOL, pools: { [FALLBACK_POOL]: [] } }
   }
+}
+
+/**
+ * Finds the tracked example catalog corresponding to a local JSON catalog directly under config.
+ *
+ * @param {string} file Local catalog path.
+ * @returns {string|null} Matching tracked example path, when the catalog is eligible.
+ */
+function getCatalogExampleFile(file) {
+  if (!file) return null
+  if (path.resolve(file) === path.resolve(DEFAULT_GREETINGS_FILE)) return DEFAULT_GREETINGS_EXAMPLE_FILE
+
+  const relative = path.relative(CONFIG_DIRECTORY, path.resolve(file))
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.dirname(relative) !== '.') return null
+
+  const parsed = path.parse(relative)
+  if (parsed.ext.toLowerCase() !== '.json') return null
+  return path.join(CONFIG_DIRECTORY, 'examples', `${parsed.name}.example.json`)
 }
 
 function normalizeCatalog(value) {
@@ -209,5 +231,6 @@ module.exports = {
   createGreetingService,
   DEFAULT_GREETINGS_EXAMPLE_FILE,
   DEFAULT_GREETINGS_FILE,
-  DEFAULT_SETTINGS_FILE
+  DEFAULT_SETTINGS_FILE,
+  getCatalogExampleFile
 }

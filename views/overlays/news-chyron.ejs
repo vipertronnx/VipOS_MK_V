@@ -27,47 +27,13 @@ const initialChyronItem = chyronItems[initialChyronIndex];
 </div>
 
 <script>
-  (() => {
-    const items = <%- chyronItemsJson %>;
-    const rotateIntervalMs = <%- JSON.stringify(chyronRotateIntervalMs) %>;
-    const title = document.getElementById('chyron-title-text');
-    const headline = document.getElementById('chyron-headline-text');
-    const subhead = document.getElementById('chyron-subhead-text');
-    const chyronText = document.getElementById('chyron-text');
-    const fadeDurationMs = 500;
-    let currentIndex = <%- JSON.stringify(initialChyronIndex) %>;
-
-    if (!title || !headline || !subhead || !chyronText || items.length < 2 || rotateIntervalMs <= 0) return;
-
-    function getNextIndex() {
-      let nextIndex = Math.floor(Math.random() * items.length);
-      if (nextIndex === currentIndex) nextIndex = (nextIndex + 1) % items.length;
-      return nextIndex;
-    }
-
-    function renderItem(item) {
-      title.textContent = item.h3;
-      headline.textContent = item.h1;
-      subhead.textContent = item.h2;
-    }
-
-    function transitionToItem(item) {
-      chyronText.classList.add('is-fading');
-
-      window.setTimeout(() => {
-        renderItem(item);
-        window.requestAnimationFrame(() => {
-          chyronText.classList.remove('is-fading');
-        });
-      }, fadeDurationMs);
-    }
-
-    window.setInterval(() => {
-      currentIndex = getNextIndex();
-      transitionToItem(items[currentIndex]);
-    }, rotateIntervalMs);
-  })();
+  window.VIPOS_CHYRON = {
+    initialIndex: <%- JSON.stringify(initialChyronIndex) %>,
+    items: <%- chyronItemsJson %>,
+    rotateIntervalMs: <%- JSON.stringify(chyronRotateIntervalMs) %>
+  };
 </script>
+<script type="text/javascript" src="/assets/js/news-chyron.js"></script>
 <script type="text/javascript" src="/assets/js/lower-third.js"></script>
 
 <%- include("../templates/footer") %>

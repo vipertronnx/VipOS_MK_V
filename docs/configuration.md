@@ -126,6 +126,7 @@ Slide distances accept numeric `px`, `%`, `vh`, `vw`, `rem`, or `em` values. Sli
 | `config/sfx-text.json` | `config/examples/sfx-text.example.json` | Random sound selection uses the tracked example. |
 | `config/news-chyron.json` | `config/examples/news-chyron.example.json` | Used only when `NEWS_CHYRON_ITEMS` points to it; otherwise the configured default is used. |
 | `config/tv-guide.json` | `config/examples/tv-guide.example.json` | The TV Guide uses `TV_GUIDE_ITEMS_DEFAULT`. |
+| `config/welcome-followers.json` | `config/examples/welcome-followers.example.json` | File-backed text used by the configured follower welcome picker. |
 | `config/raffle.json` | `config/examples/raffle.example.json` | The raffle service starts with built-in defaults and creates state when a durable change is saved. |
 
 Refreshed Twitch tokens are stored separately in `config/twitch-token.json` and `config/twitch-broadcaster-token.json`. Do not edit or commit token files while the application is running.
@@ -144,6 +145,8 @@ Use an explicit `id` when another system calls the macro API. `description` is o
 `config/greetings.json` can be a string array or an object with `defaultPool` and `pools`. The control panel writes the selected pool to `config/greetings-settings.json`.
 
 `context.pickRandom` uses the active greeting pool unless the action supplies an inline `items` list, a `pool` or `theme`, or a JSON `file` within `config/`.
+
+`config/welcome-followers.json` is a dedicated string-array catalog for follower welcome messages. The default `new-follower` handler stores a selected entry at `{welcomeFollower}` before sending its chyron alert. A missing local catalog uses `config/examples/welcome-followers.example.json`.
 
 ## Sound labels and random selection
 
@@ -164,6 +167,7 @@ Actions are used by macros, Twitch automation, the raffle, and the action API.
 | Type | Required fields | Behavior |
 | --- | --- | --- |
 | `chat.say` | `message` or `text` | Sends a Twitch chat message; `reply: true` replies to the triggering message when an ID is available. |
+| `chyron.alert` | `h1`, `h2`, and `h3` | Makes both shared lower thirds visible, then replaces all news-chyron text. |
 | `context.pickRandom` | `contextKey` or `key` | Stores an inline or configured random text value in the action context. |
 | `delay` | None | Waits for `ms` or `duration`, capped at ten minutes. |
 | `log` | None | Writes the hydrated `message` to the application logger. |

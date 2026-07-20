@@ -42,9 +42,10 @@ Copy-Item config/examples/news-chyron.example.json config/news-chyron.json
 Copy-Item config/examples/raffle.example.json config/raffle.json
 Copy-Item config/examples/sfx-text.example.json config/sfx-text.json
 Copy-Item config/examples/tv-guide.example.json config/tv-guide.json
+Copy-Item config/examples/welcome-followers.example.json config/welcome-followers.json
 ```
 
-See [Configuration](configuration.md) before editing these files. The application has tracked example fallbacks for macros, greetings, sound labels, the news chyron, and the TV Guide. Twitch commands do not use the tracked example as a runtime fallback; copy `commands.example.json` when Twitch automation is needed.
+See [Configuration](configuration.md) before editing these files. The application has tracked example fallbacks for macros, greetings, sound labels, follower welcome text, the news chyron, and the TV Guide. Twitch commands do not use the tracked example as a runtime fallback; copy `commands.example.json` when Twitch automation is needed.
 
 Do not overwrite existing local configuration. In particular, `config/raffle.json` can contain live raffle state, user points, and history.
 

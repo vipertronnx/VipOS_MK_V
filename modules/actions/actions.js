@@ -29,6 +29,7 @@ const ACTION_DEFINITIONS = {
   'obs.mute': { execute: executeObsMute, requiredFields: [['input', 'source']] },
   'obs.scene': { execute: executeObsScene, requiredFields: [['scene']] },
   'obs.source': { execute: executeObsSource, requiredFields: [['source', 'input']] },
+  'chyron.alert': { execute: executeChyronAlert, quietable: true, requiredFields: [['h1'], ['h2'], ['h3']] },
   'overlay.alert': { execute: executeOverlayAlert, quietable: true, requiredFields: [['message']] },
   'overlay.emit': { execute: executeOverlayEmit, quietable: true, requiredFields: [['event']] },
   'sound.pickRandom': { execute: executeSoundPickRandom, quietable: true, requiredFields: [], sound: true },
@@ -276,6 +277,26 @@ function executeOverlayAlert(action, context, options, runtime) {
   runtime.io.emit('text-alert', { message })
   const soundResult = maybePlayAlertSound(action, context, options, runtime)
   return soundResult ? { type: 'overlay.alert', message, sound: soundResult } : { type: 'overlay.alert', message }
+}
+
+/**
+ * Makes the shared lower third visible, then replaces the three visible news-chyron text lines.
+ *
+ * @param {object} action Configured chyron fields.
+ * @param {object} context Values available to action placeholders.
+ * @param {object} options Reserved action-runner options.
+ * @param {object} runtime Runtime Socket.IO dependencies.
+ * @returns {{type: string, h1: string, h2: string, h3: string}} Emitted chyron alert data.
+ */
+function executeChyronAlert(action, context, options, runtime) {
+  const h1 = hydrate(action.h1, context)
+  const h2 = hydrate(action.h2, context)
+  const h3 = hydrate(action.h3, context)
+  if (!h1 || !h2 || !h3) throw new Error('chyron.alert requires h1, h2, and h3')
+
+  runtime.overlayEmit('lower-third-show')
+  runtime.io.emit('chyron-alert', { h1, h2, h3 })
+  return { type: 'chyron.alert', h1, h2, h3 }
 }
 
 function executeOverlayEmit(action, context, options, runtime) {

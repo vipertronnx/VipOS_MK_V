@@ -108,7 +108,8 @@
       "cooldownScope": "user",
       "cooldownSeconds": 10,
       "actions": [
-        { "type": "overlay.alert", "message": "Welcome in, {displayName}! Thanks for the follow." },
+        { "type": "context.pickRandom", "contextKey": "welcomeFollower", "file": "welcome-followers.json" },
+        { "type": "chyron.alert", "h3": "NEW FOLLOWER DETECTED", "h1": "{displayName}", "h2": "{welcomeFollower}" },
         { "type": "chat.say", "message": "Welcome in, {displayName}! Thanks for following." }
       ]
     }

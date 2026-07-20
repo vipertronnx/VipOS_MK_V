@@ -85,6 +85,7 @@ test('action structure validation accepts every supported action type', () => {
     { type: 'obs.mute', input: 'Music' },
     { type: 'obs.scene', scene: 'Live' },
     { type: 'obs.source', source: 'Camera' },
+    { type: 'chyron.alert', h1: 'Headline', h2: 'Subhead', h3: 'Title' },
     { type: 'overlay.alert', message: '{displayName} joined' },
     { type: 'overlay.emit', event: 'bg-alert' },
     { type: 'sound.pickRandom' },
@@ -126,6 +127,7 @@ test('action structure validation rejects unknown types and missing required fie
     ['obs.mute', {}, 'obs.mute requires input or source'],
     ['obs.scene', {}, 'obs.scene requires scene'],
     ['obs.source', {}, 'obs.source requires source or input'],
+    ['chyron.alert', {}, 'chyron.alert requires h1'],
     ['overlay.alert', {}, 'overlay.alert requires message'],
     ['overlay.emit', {}, 'overlay.emit requires event'],
     ['sound.play', {}, 'sound.play requires src or path']
@@ -267,6 +269,7 @@ test('quiet mode suppresses the action definitions marked as quietable', async (
   })
 
   const results = await actions.run([
+    { type: 'chyron.alert', h1: 'Quiet', h2: 'Alert', h3: 'Chyron' },
     { type: 'overlay.alert', message: 'Quiet alert' },
     { type: 'overlay.emit', event: 'quiet-event' },
     { type: 'sound.pickRandom' },
@@ -274,15 +277,59 @@ test('quiet mode suppresses the action definitions marked as quietable', async (
     { type: 'log', message: 'Still logged' }
   ], { source: 'chat' })
 
-  assert.deepEqual(results.slice(0, 4), [
+  assert.deepEqual(results.slice(0, 5), [
+    { type: 'chyron.alert', suppressed: true, reason: 'quiet-mode' },
     { type: 'overlay.alert', suppressed: true, reason: 'quiet-mode' },
     { type: 'overlay.emit', suppressed: true, reason: 'quiet-mode' },
     { type: 'sound.pickRandom', suppressed: true, reason: 'quiet-mode' },
     { type: 'sound.play', suppressed: true, reason: 'quiet-mode' }
   ])
-  assert.deepEqual(results[4], { type: 'log', message: 'Still logged' })
+  assert.deepEqual(results[5], { type: 'log', message: 'Still logged' })
   assert.deepEqual(emitted, [])
   assert.deepEqual(logs, ['Still logged'])
+})
+
+test('chyron alerts hydrate all text fields and request shared lower-third visibility', async () => {
+  const emitted = []
+  const overlayEvents = []
+  const actions = createActionRunner({
+    io: {
+      emit(event, payload) {
+        emitted.push({ event, payload })
+      }
+    },
+    logger: { error() {}, log() {}, warn() {} },
+    obs: {},
+    overlayEmit(event, payload) {
+      overlayEvents.push({ event, payload })
+    }
+  })
+
+  const results = await actions.run({
+    type: 'chyron.alert',
+    h1: '{displayName}',
+    h2: '{welcomeFollower}',
+    h3: 'NEW FOLLOWER'
+  }, {
+    displayName: 'Viper',
+    welcomeFollower: 'WELCOME ABOARD'
+  })
+
+  assert.deepEqual(results, [{
+    type: 'chyron.alert',
+    h1: 'Viper',
+    h2: 'WELCOME ABOARD',
+    h3: 'NEW FOLLOWER'
+  }])
+  assert.deepEqual(emitted, [{
+    event: 'chyron-alert',
+    payload: {
+      h1: 'Viper',
+      h2: 'WELCOME ABOARD',
+      h3: 'NEW FOLLOWER'
+    }
+  }])
+  assert.deepEqual(overlayEvents, [{ event: 'lower-third-show', payload: undefined }])
 })
 
 test('explicit sound action definitions suppress an alert default sound', async () => {
