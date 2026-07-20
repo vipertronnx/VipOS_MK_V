@@ -151,6 +151,32 @@ test('leaving configured scenes restarts the shared timer from a visible state',
   assert.equal(lowerThird.getStatus().hidden, true)
 })
 
+test('showing the shared lower thirds restarts a full visibility interval', () => {
+  const io = createIo()
+  const timers = createTimers()
+  const lowerThird = createLowerThirdSync({
+    clearTimer: timers.clearTimer,
+    io,
+    setTimer: timers.setTimer,
+    toggleIntervalMs: 1000
+  })
+  const initialTimer = timers.scheduled[0]
+
+  lowerThird.emitOverlayEvent('lower-third-show')
+
+  assert.equal(lowerThird.getStatus().hidden, false)
+  assert.deepEqual(timers.cleared, [initialTimer])
+  assert.equal(timers.scheduled.length, 2)
+  assert.equal(timers.scheduled[1].delay, 1000)
+  assert.deepEqual(io.emitted.at(-1), {
+    event: 'lower-third-show',
+    payload: { hidden: false }
+  })
+
+  timers.scheduled[1].callback()
+  assert.equal(lowerThird.getStatus().hidden, true)
+})
+
 test('new overlay sockets synchronize the currently forced shared state', () => {
   const io = createIo()
   const timers = createTimers()

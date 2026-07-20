@@ -66,6 +66,11 @@ function createLowerThirdSync({
     timer = setTimer(toggle, toggleIntervalMs)
   }
 
+  function restartTimer() {
+    stopTimer()
+    startTimer()
+  }
+
   function setHidden(nextHidden, event) {
     if (forcedVisible && nextHidden) return getStatus()
 
@@ -79,6 +84,13 @@ function createLowerThirdSync({
 
     hidden = !hidden
     emitState()
+    return getStatus()
+  }
+
+  function show() {
+    hidden = false
+    emitState('lower-third-show')
+    restartTimer()
     return getStatus()
   }
 
@@ -97,17 +109,12 @@ function createLowerThirdSync({
     if (nextForcedVisible === forcedVisible) return getStatus()
 
     forcedVisible = nextForcedVisible
-    stopTimer()
-    hidden = false
-    emitState('lower-third-show')
-
-    if (!forcedVisible) startTimer()
-    return getStatus()
+    return show()
   }
 
   function emitOverlayEvent(event, payload = {}) {
     if (event === 'lower-third-hide') return setHidden(true, event)
-    if (event === 'lower-third-show') return setHidden(false, event)
+    if (event === 'lower-third-show') return show()
     if (event === 'lower-third-toggle') {
       if (payload && typeof payload.hidden === 'boolean') return setHidden(payload.hidden, event)
       return toggle()
@@ -141,7 +148,7 @@ function createLowerThirdSync({
     getStatus,
     hide: () => setHidden(true, 'lower-third-hide'),
     setCurrentObsScene,
-    show: () => setHidden(false, 'lower-third-show'),
+    show,
     stop: stopTimer,
     toggle
   }

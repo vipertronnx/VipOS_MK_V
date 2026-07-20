@@ -168,7 +168,7 @@ Actions are used by macros, Twitch automation, the raffle, and the action API.
 | --- | --- | --- |
 | `border.alert` | None | Triggers the animated stream border without alert text. |
 | `chat.say` | `message` or `text` | Sends a Twitch chat message; `reply: true` replies to the triggering message when an ID is available. |
-| `chyron.alert` | `h1`, `h2`, and `h3` | Makes both shared lower thirds visible, then replaces all news-chyron text. |
+| `chyron.alert` | `h1`, `h2`, and `h3` | Makes both shared lower thirds visible, restarts their shared timer, then replaces all news-chyron text. |
 | `context.pickRandom` | `contextKey` or `key` | Stores an inline or configured random text value in the action context. |
 | `delay` | None | Waits for `ms` or `duration`, capped at ten minutes. |
 | `log` | None | Writes the hydrated `message` to the application logger. |

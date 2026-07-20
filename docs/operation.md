@@ -87,7 +87,7 @@ Changes made by these mutation endpoints require persistence. If `config/raffle.
 
 ## Lower thirds
 
-The news chyron and Venom Coin overlays share synchronized hide/show state. The server toggles that state every `LOWER_THIRD_TOGGLE_INTERVAL_MS` milliseconds unless the interval is `0`.
+The news chyron and Venom Coin overlays share synchronized hide/show state. The server toggles that state every `LOWER_THIRD_TOGGLE_INTERVAL_MS` milliseconds unless the interval is `0`. Explicit show events, including `chyron.alert`, restart a full interval so both overlays remain visible together for the configured duration.
 
 Set `LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` to a JSON array of exact OBS program-scene names to force both overlays visible while one of those scenes is active. The shared timer pauses in those scenes and restarts from its full interval when OBS leaves them. Only OBS program-scene changes apply; Studio Mode preview changes do not.
 
