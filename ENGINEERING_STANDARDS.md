@@ -165,6 +165,7 @@ Tests must use Node's built-in `node:test` runner and `node:assert` APIs and liv
 Run the complete suite before committing:
 
 ```bash
+npm run check:types
 npm test
 npm run check:docs
 ```
@@ -192,6 +193,10 @@ Documentation must be updated in the same change when work modifies:
 
 Examples must contain safe, distributable values and must not include secrets or machine-specific paths.
 
+Shared service APIs, queue snapshots, Twitch contexts, and OBS discovery results must use the declaration-only contracts under `types/` in their JSDoc. Method comments should describe behavior, side effects, and error conditions without repeating contract property lists.
+
+`npm run check:docs` validates documented function parameters, async return annotations, and directly inferable return shapes. Keep JSDoc tags synchronized with implementation signatures.
+
 ## Change checklist
 
 Before considering a change complete, verify that:
@@ -204,6 +209,7 @@ Before considering a change complete, verify that:
 - local-only security assumptions remain true;
 - public routes, events, configuration, and status shapes remain compatible;
 - focused tests prove the behavior and relevant failure paths;
+- `npm run check:types` passes;
 - `npm test` passes;
 - generated assets and documentation are updated when applicable;
 - `git status` contains only the intended change set.

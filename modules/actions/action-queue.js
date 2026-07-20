@@ -1,6 +1,10 @@
 const { normalizeCompletionDelay } = require('../utils/completion-delay')
 const { userInputError } = require('../utils/errors')
 
+/** @typedef {import('../../types/action-queue').ActionQueue} ActionQueue */
+/** @typedef {import('../../types/action-queue').QueueRequest} QueueRequest */
+/** @typedef {import('../../types/action-queue').QueueSnapshot} QueueSnapshot */
+
 /**
  * Creates a serial action queue that records execution history and waits for sound completion when needed.
  *
@@ -8,7 +12,7 @@ const { userInputError } = require('../utils/errors')
  * @param {object} options.actions Action runner exposing `run` and optionally `validateStructure`.
  * @param {number} [options.soundCompletionBufferMs=250] Extra milliseconds added after a known sound duration.
  * @param {number} [options.soundCompletionFallbackMs=4000] Delay used when a sound duration cannot be determined.
- * @returns {object} Queue controls and a snapshot-based status accessor.
+ * @returns {ActionQueue} Queue controls and a snapshot-based status accessor.
  */
 function createActionQueue({
   actions,
@@ -31,10 +35,10 @@ function createActionQueue({
   /**
    * Adds actions to the queue and initiates background processing unless it is paused.
    *
-   * @param {object} item Queued action definition.
+   * @param {QueueRequest} item Queued action definition.
    * @param {object|Array<object>} item.actions Action or action list; validated first when the runner exposes `validateStructure`.
    * @param {number} [item.completionDelayMs] Explicit post-run delay in milliseconds; `delayMs` is accepted as an alias.
-   * @returns {object} Immediate queue snapshot; action completion is reported later through queue status and history.
+   * @returns {QueueSnapshot} Immediate queue snapshot; action completion is reported later through queue status and history.
    * @throws {Error} Throws when actions are missing or fail runner validation.
    */
   function enqueue({
@@ -70,12 +74,22 @@ function createActionQueue({
     return snapshot()
   }
 
+  /**
+   * Pauses background processing without interrupting an action already running.
+   *
+   * @returns {QueueSnapshot} Snapshot reflecting the paused state.
+   */
   function pause() {
     paused = true
     recordActivity('paused')
     return snapshot()
   }
 
+  /**
+   * Resumes background processing and starts the next pending item when one is available.
+   *
+   * @returns {QueueSnapshot} Snapshot reflecting the resumed state before later queued work completes.
+   */
   function resume() {
     paused = false
     recordActivity('resumed')
@@ -83,6 +97,11 @@ function createActionQueue({
     return snapshot()
   }
 
+  /**
+   * Marks pending items as cleared without interrupting an action already running.
+   *
+   * @returns {QueueSnapshot} Snapshot with removed items recorded in history.
+   */
   function clear() {
     const cleared = pending.splice(0)
     for (const item of cleared) {
@@ -92,12 +111,22 @@ function createActionQueue({
     return snapshot()
   }
 
+  /**
+   * Removes and records the next pending item without running it.
+   *
+   * @returns {QueueSnapshot} Snapshot after the next item has been skipped, if one was pending.
+   */
   function skipNext() {
     const item = pending.shift()
     if (item) finish(item, 'skipped')
     return snapshot()
   }
 
+  /**
+   * Returns the current serializable queue snapshot.
+   *
+   * @returns {QueueSnapshot} Pending, running, history, activity, and pause state.
+   */
   function getStatus() {
     return snapshot()
   }

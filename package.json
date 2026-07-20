@@ -8,6 +8,7 @@
     "dev": "nodemon app.js",
     "test": "node --test",
     "check:docs": "node scripts/check-docs.js",
+    "check:types": "tsc -p tsconfig.check.json",
     "simulate:twitch-event": "node scripts/simulate-twitch-event.js",
     "build:css": "sass --style=compressed public/assets/sass/styles.scss:public/assets/css/styles.css public/assets/sass/control.scss:public/assets/css/control.css",
     "watch:css": "sass --style=compressed --watch public/assets/sass/styles.scss:public/assets/css/styles.css public/assets/sass/control.scss:public/assets/css/control.css"
@@ -30,7 +31,9 @@
     "socket.io": "^4.7.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "nodemon": "^3.1.11",
-    "sass": "^1.99.0"
+    "sass": "^1.99.0",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,12 +1,16 @@
 const { default: OBSWebSocket } = require('obs-websocket-js')
 const { userInputError } = require('./utils/errors')
 
+/** @typedef {import('../types/obs').ObsDiscovery} ObsDiscovery */
+/** @typedef {import('../types/obs').ObsService} ObsService */
+/** @typedef {import('../types/obs').ObsStatus} ObsStatus */
+
 /**
  * Creates an environment-configured OBS WebSocket service that serializes requested lifecycle transitions and schedules reconnects after connection-closed events while running.
  *
  * @param {object} [options] Client and timer dependencies, primarily for runtime integration and testing.
  * @param {object} [options.obsClient] OBS WebSocket-compatible client.
- * @returns {object} Connection lifecycle, OBS request, scene, source, input, and discovery operations.
+ * @returns {ObsService} Connection lifecycle, OBS request, scene, source, input, and discovery operations.
  */
 function createObsService({
   clearTimer = clearTimeout,
@@ -60,6 +64,11 @@ function createObsService({
     state.currentScene = data.sceneName
   })
 
+  /**
+   * Queues a connection attempt and enables reconnects after unexpected connection loss.
+   *
+   * @returns {Promise<void>} Resolves after the serialized connection transition completes; failures are recorded in service status.
+   */
   function connect() {
     const version = ++lifecycleVersion
     shouldRun = true
@@ -100,6 +109,12 @@ function createObsService({
     }
   }
 
+  /**
+   * Queues disconnection and prevents pending or future reconnect attempts.
+   *
+   * @returns {Promise<void>} Resolves after the serialized disconnect transition completes.
+   * @throws {Error} Rejects when the OBS client cannot disconnect.
+   */
   function disconnect() {
     lifecycleVersion += 1
     shouldRun = false
@@ -136,6 +151,14 @@ function createObsService({
     state.reconnectTimer = null
   }
 
+  /**
+   * Sends a raw OBS WebSocket request through the service's configured client.
+   *
+   * @param {string} requestType OBS request type accepted by the connected server.
+   * @param {object} [requestData={}] Request-specific payload.
+   * @returns {Promise<unknown>} Response returned by OBS.
+   * @throws {Error} Rejects when OBS is not configured or the request fails.
+   */
   async function call(requestType, requestData = {}) {
     if (!state.enabled) throw new Error('OBS is not configured')
 
@@ -147,6 +170,12 @@ function createObsService({
     }
   }
 
+  /**
+   * Reads the current program scene and updates the cached scene name.
+   *
+   * @returns {Promise<string>} Current program scene name.
+   * @throws {Error} Rejects when OBS cannot complete the scene request.
+   */
   async function getCurrentScene() {
     const data = await call('GetCurrentProgramScene')
     state.currentScene = data.currentProgramSceneName
@@ -156,7 +185,7 @@ function createObsService({
   /**
    * Retrieves scenes, their sources, and available inputs for control-surface selection.
    *
-   * @returns {Promise<object>} Current scene plus scene sources, inputs, and media-capable inputs; a failed scene-item request is returned on that scene with an empty source list.
+   * @returns {Promise<ObsDiscovery>} Current scene plus scene sources, inputs, and media-capable inputs; a failed scene-item request is returned on that scene with an empty source list.
    * @throws {Error} Rejects when the required top-level OBS list requests fail.
    */
   async function getDiscovery() {
@@ -201,6 +230,13 @@ function createObsService({
     }
   }
 
+  /**
+   * Switches OBS to the named program scene and updates the cached scene name after success.
+   *
+   * @param {string} sceneName Existing OBS scene name to make active.
+   * @returns {Promise<void>} Resolves after OBS accepts the scene change.
+   * @throws {Error} Rejects when the scene request fails.
+   */
   async function switchScene(sceneName) {
     await call('SetCurrentProgramScene', { sceneName })
     state.currentScene = sceneName
@@ -212,6 +248,15 @@ function createObsService({
     return { sceneName: scene, sceneItemId: data.sceneItemId }
   }
 
+  /**
+   * Sets visibility for a source in a scene, resolving the source's scene-item identifier first.
+   *
+   * @param {string|undefined} sceneName Scene containing the source; `undefined` uses the current program scene.
+   * @param {string} sourceName Source name within the selected scene.
+   * @param {boolean} sceneItemEnabled Whether OBS should render the source.
+   * @returns {Promise<void>} Resolves after OBS accepts the visibility update.
+   * @throws {Error} Rejects when the scene-item lookup or visibility request fails.
+   */
   async function setSourceVisibility(sceneName, sourceName, sceneItemEnabled) {
     const item = await getSceneItemId(sceneName, sourceName)
     await call('SetSceneItemEnabled', {
@@ -221,6 +266,14 @@ function createObsService({
     })
   }
 
+  /**
+   * Inverts visibility for a source and returns the enabled state sent to OBS.
+   *
+   * @param {string|undefined} sceneName Scene containing the source; `undefined` uses the current program scene.
+   * @param {string} sourceName Source name within the selected scene.
+   * @returns {Promise<boolean>} New source visibility state.
+   * @throws {Error} Rejects when the scene-item lookup or visibility request fails.
+   */
   async function toggleSourceVisibility(sceneName, sourceName) {
     const item = await getSceneItemId(sceneName, sourceName)
     const data = await call('GetSceneItemEnabled', {
@@ -232,10 +285,25 @@ function createObsService({
     return nextVisible
   }
 
+  /**
+   * Sets the mute state for an OBS input.
+   *
+   * @param {string} inputName Existing OBS input name.
+   * @param {boolean} inputMuted Whether the input should be muted.
+   * @returns {Promise<void>} Resolves after OBS accepts the mute update.
+   * @throws {Error} Rejects when the mute request fails.
+   */
   async function setInputMute(inputName, inputMuted) {
     await call('SetInputMute', { inputName, inputMuted })
   }
 
+  /**
+   * Inverts an OBS input's mute state and returns the state sent to OBS.
+   *
+   * @param {string} inputName Existing OBS input name.
+   * @returns {Promise<boolean>} New mute state.
+   * @throws {Error} Rejects when the mute lookup or update fails.
+   */
   async function toggleInputMute(inputName) {
     const data = await call('GetInputMute', { inputName })
     const nextMuted = !data.inputMuted
@@ -243,11 +311,24 @@ function createObsService({
     return nextMuted
   }
 
+  /**
+   * Triggers a normalized media action for an OBS media input.
+   *
+   * @param {string} inputName Existing OBS media input name.
+   * @param {string} action User-facing media action accepted by `normalizeMediaAction`.
+   * @returns {Promise<void>} Resolves after OBS accepts the media command.
+   * @throws {Error} Rejects for unsupported actions or failed OBS requests.
+   */
   async function mediaAction(inputName, action) {
     const mediaAction = normalizeMediaAction(action)
     await call('TriggerMediaInputAction', { inputName, mediaAction })
   }
 
+  /**
+   * Returns the current serializable OBS connection status.
+   *
+   * @returns {ObsStatus} Enabled, connection, identification, scene, and last-error state.
+   */
   function getStatus() {
     return {
       enabled: state.enabled,

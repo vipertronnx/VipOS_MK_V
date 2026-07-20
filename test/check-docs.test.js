@@ -50,6 +50,138 @@ test('documentation checks report environment variables missing from the referen
   assert.ok(errors.includes('UNDOCUMENTED_VALUE is read by application code but absent from .env.example and docs/configuration.md'))
 })
 
+test('documentation checks report JSDoc parameter names that do not match a function signature', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @param {string} message Text to return.',
+      ' * @returns {string} The supplied text.',
+      ' */',
+      'function echo(value) {',
+      '  return value',
+      '}',
+      'module.exports = echo'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('echo documents parameter message but declares value')))
+})
+
+test('documentation checks report missing parameter tags on documented functions', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @returns {string} The supplied text.',
+      ' */',
+      'function echo(value) {',
+      '  return value',
+      '}',
+      'module.exports = echo'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('echo documents 0 parameters but declares 1')))
+})
+
+test('documentation checks report unknown properties documented for destructured parameters', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @param {object} options Configuration values.',
+      ' * @param {boolean} options.enabled Whether the feature is enabled.',
+      ' * @param {string} options.missing Unsupported setting.',
+      ' * @returns {boolean} Current enabled state.',
+      ' */',
+      'function configure({ enabled }) {',
+      '  return enabled',
+      '}',
+      'module.exports = configure'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('configure documents unknown destructured parameter options.missing')))
+})
+
+test('documentation checks require Promise return types for async functions', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @returns {string} Loaded value.',
+      ' */',
+      'async function load() {',
+      "  return 'ready'",
+      '}',
+      'module.exports = load'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('load is async but its @returns type is not Promise-like')))
+})
+
+test('documentation checks require return documentation for documented value-returning functions', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @param {string} value Value to normalize.',
+      ' */',
+      'function normalize(value) {',
+      '  return value.trim()',
+      '}',
+      'module.exports = normalize'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('normalize returns a value but has no @returns tag')))
+})
+
+test('documentation checks report incompatible documented return shapes', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @returns {{count: string}} Count summary.',
+      ' */',
+      'function summarize() {',
+      '  return { count: 1 }',
+      '}',
+      'module.exports = summarize'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('summarize returns { count: number; } but its @returns type is { count: string; }')))
+})
+
+test('documentation checks report incompatible imported return contracts', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/** @typedef {import(\'./types/contracts\').Summary} Summary */',
+      '/**',
+      ' * @returns {Summary} Count summary.',
+      ' */',
+      'function summarize() {',
+      '  return { count: 1 }',
+      '}',
+      'module.exports = summarize'
+    ].join('\n'),
+    contracts: 'export interface Summary { count: string }\n'
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('summarize returns { count: number; } but its @returns type is Summary')))
+})
+
 function createProjectFixture(t, overrides = {}) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'vipos-docs-'))
   t.after(() => fs.rmSync(projectRoot, { force: true, recursive: true }))
@@ -61,6 +193,7 @@ function createProjectFixture(t, overrides = {}) {
   write(projectRoot, 'app.js', overrides.app || 'const value = process.env.DOCUMENTED_VALUE\nmodule.exports = value\n')
   fs.mkdirSync(path.join(projectRoot, 'modules'), { recursive: true })
   fs.mkdirSync(path.join(projectRoot, 'scripts'), { recursive: true })
+  if (overrides.contracts) write(projectRoot, 'types/contracts.d.ts', overrides.contracts)
 
   return projectRoot
 }

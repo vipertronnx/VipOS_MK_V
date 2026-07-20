@@ -5,6 +5,12 @@ const { userInputError } = require('../utils/errors')
 const { createGreetingService } = require('./greetings')
 const { asArray } = require('../utils/value-normalization')
 
+/** @typedef {import('../../types/actions').ActionContext} ActionContext */
+/** @typedef {import('../../types/actions').ActionInput} ActionInput */
+/** @typedef {import('../../types/actions').ActionResult} ActionResult */
+/** @typedef {import('../../types/actions').ActionRunner} ActionRunner */
+/** @typedef {import('../../types/actions').ChatMessageSender} ChatMessageSender */
+
 const DEFAULT_SOUND_DIRECTORY = path.join(__dirname, '..', '..', 'public', 'assets', 'sounds')
 const DEFAULT_SOUND_TEXT_FILE = path.join(__dirname, '..', '..', 'config', 'sfx-text.json')
 const DEFAULT_SOUND_TEXT_EXAMPLE_FILE = path.join(__dirname, '..', '..', 'config', 'examples', 'sfx-text.example.json')
@@ -92,7 +98,7 @@ function listSoundFiles({
  * @param {object} options Runtime services and configurable local asset dependencies.
  * @param {object} options.io Socket server used for overlay and sound events.
  * @param {object} options.obs OBS service used by OBS action types.
- * @returns {{run: Function, setChatService: Function, validateStructure: Function}} Action execution API.
+ * @returns {ActionRunner} Action execution API.
  */
 function createActionRunner({
   io,
@@ -122,6 +128,12 @@ function createActionRunner({
     waitForDelay
   }
 
+  /**
+   * Sets the chat sender used by `chat.say` actions after chat service construction.
+   *
+   * @param {ChatMessageSender} service Chat service exposing the message-sending operation.
+   * @returns {void}
+   */
   function setChatService(service) {
     chatService = service
   }
@@ -130,9 +142,9 @@ function createActionRunner({
    * Validates and executes actions sequentially against a shared context that picker actions may extend.
    * Depending on action type, execution can wait, send chat or OBS requests, emit socket events, and read local sound configuration.
    *
-   * @param {object|Array<object>} actions One action or ordered action list.
-   * @param {object} [context={}] Event data available to placeholders and context-picking actions.
-   * @returns {Promise<Array<object>>} Results in the same order as the executed actions.
+   * @param {ActionInput} actions One action or ordered action list.
+   * @param {ActionContext} [context={}] Event data available to placeholders and context-picking actions.
+   * @returns {Promise<ActionResult[]>} Results in the same order as the executed actions.
    * @throws {Error} Rejects when an action is invalid or its executor fails.
    */
   async function run(actions, context = {}) {

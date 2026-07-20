@@ -32,5 +32,8 @@ jobs:
       - name: Check documentation
         run: npm run check:docs
 
+      - name: Check TypeScript declarations
+        run: npm run check:types
+
       - name: Run tests
         run: npm test

@@ -44,6 +44,11 @@ const {
 } = require('./chat-eventsub-plan')
 const { createRetryScheduler } = require('./chat-retry')
 
+/** @typedef {import('../../types/chat').ChatSendOptions} ChatSendOptions */
+/** @typedef {import('../../types/chat').ChatSendResult} ChatSendResult */
+/** @typedef {import('../../types/chat').ChatService} ChatService */
+/** @typedef {import('../../types/chat').ChatStatus} ChatStatus */
+
 const DEFAULT_COMMAND_PREFIX = '!'
 const DEFAULT_COMMANDS_FILE = path.join(__dirname, '..', '..', 'config', 'commands.json')
 const DEFAULT_RECONNECT_INITIAL_MS = 5000
@@ -57,7 +62,7 @@ let twurpleModules = null
  * @param {object} options.actions Action runner used by chat automation.
  * @param {object|null} [options.actionQueue] Queue used to serialize automation actions.
  * @param {object|null} [options.raffle] Raffle service allowed to consume chat commands first.
- * @returns {object} Start/stop, status, chat-send, and supported-event simulation operations.
+ * @returns {ChatService} Start/stop, status, chat-send, and supported-event simulation operations.
  */
 function createChatService({ actions, actionQueue = null, commandConfigFileSystem, logger = console, onReady = null, raffle = null, twurpleLoader = loadTwurple } = {}) {
   if (!actions) throw new Error('Chat service requires an action runner')
@@ -188,6 +193,12 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
     }
   })
 
+  /**
+   * Starts command loading, Twitch authentication, EventSub registration, and configuration watching.
+   * Startup failures are recorded and may schedule a retry instead of rejecting the caller.
+   *
+   * @returns {Promise<void>} Resolves after startup work has completed or a handled startup failure has been recorded.
+   */
   async function start() {
     shouldRun = true
 
@@ -261,6 +272,11 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
     }
   }
 
+  /**
+   * Stops retries, EventSub listening, and command-file watching.
+   *
+   * @returns {void}
+   */
   function stop() {
     shouldRun = false
     startupRetry.reset()
@@ -293,8 +309,8 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
    * Sends a chat message or records a simulated send while simulation is active.
    *
    * @param {string} message Non-empty message text to send.
-   * @param {object} [options] Optional simulation and reply-parent settings.
-   * @returns {Promise<object>} Twitch send result or a simulated result with a generated ID.
+   * @param {ChatSendOptions} [options] Optional simulation and reply-parent settings.
+   * @returns {Promise<ChatSendResult>} Twitch send result or a simulated result with a generated ID.
    * @throws {Error} Rejects when chat is not ready, the message is empty, or Twitch fails to send it.
    */
   async function say(message, options = {}) {
@@ -596,7 +612,7 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
    * When an action queue is configured, the promise resolves after matching actions are enqueued, not after queue completion.
    *
    * @param {string} type Supported event name or alias for follow, raid, or subscription events.
-   * @param {object} event Event payload shaped like the corresponding Twurple event.
+   * @param {Record<string, unknown>} event Event payload shaped like the corresponding Twurple event.
    * @returns {Promise<void>} Resolves after matching handlers have been dispatched.
    * @throws {Error} Rejects for unsupported event types or failures from matching automation handlers.
    */
@@ -645,6 +661,11 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
     updateCommandsRestartRequirement()
   }
 
+  /**
+   * Returns the current serializable chat, EventSub, retry, and command-configuration state.
+   *
+   * @returns {ChatStatus} Current service status including listener activity.
+   */
   function getStatus() {
     return {
       ...state,
