@@ -11,8 +11,8 @@ export interface ChatSendOptions {
 export interface ChatSendResult {
   dropReasonCode?: string
   dropReasonMessage?: string
-  id: string | undefined
-  isSent: boolean | undefined
+  id: string
+  isSent: boolean
   simulated?: boolean
 }
 

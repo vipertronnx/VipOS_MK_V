@@ -1,15 +1,10 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": false,
     "module": "Node16",
     "moduleResolution": "Node16",
     "noEmit": true,
     "skipLibCheck": true,
     "target": "ES2022"
   },
-  "include": [
-    "types/**/*.d.ts",
-    "modules/actions/action-queue.js"
-  ]
+  "include": ["types/**/*.d.ts"]
 }

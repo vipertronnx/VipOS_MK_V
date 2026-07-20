@@ -182,6 +182,100 @@ test('documentation checks report incompatible imported return contracts', t => 
   assert.ok(errors.some(error => error.includes('summarize returns { count: number; } but its @returns type is Summary')))
 })
 
+test('documentation checks report unresolved imported JSDoc contracts', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/** @typedef {import(\'./types/contracts\').Missing} Missing */',
+      '/**',
+      ' * @returns {Missing} Missing contract result.',
+      ' */',
+      'function summarize() {',
+      '  return { count: 1 }',
+      '}',
+      'module.exports = summarize'
+    ].join('\n'),
+    contracts: 'export interface Summary { count: number }\n'
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('has an invalid JSDoc type') && error.includes('Missing')))
+})
+
+test('documentation checks validate return contracts on function expressions', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @returns {string} Count summary.',
+      ' */',
+      'const summarize = function () {',
+      '  return 1',
+      '}',
+      'module.exports = summarize'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('returns 1 but its @returns type is string')))
+})
+
+test('documentation checks accept concise arrow functions with return documentation', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @returns {number} Ready count.',
+      ' */',
+      'const getCount = () => 1',
+      'module.exports = getCount'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.deepEqual(errors, [])
+})
+
+test('documentation checks unwrap promise-returning expressions from async functions', t => {
+  const projectRoot = createProjectFixture(t, {
+    app: [
+      '/**',
+      ' * @returns {Promise<number>} Ready count.',
+      ' */',
+      'const getCount = async () => Promise.resolve(1)',
+      '/**',
+      ' * @returns {Promise<number>} Retry count.',
+      ' */',
+      'async function getRetryCount() {',
+      '  return Promise.resolve(2)',
+      '}',
+      'module.exports = { getCount, getRetryCount }'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.deepEqual(errors, [])
+})
+
+test('documentation checks scan browser JavaScript', t => {
+  const projectRoot = createProjectFixture(t, {
+    browser: [
+      '/**',
+      ' * @param {string} message Browser message.',
+      ' * @returns {string} Browser message.',
+      ' */',
+      'function echo(value) {',
+      '  return value',
+      '}'
+    ].join('\n')
+  })
+
+  const { errors } = checkDocumentation({ projectRoot })
+
+  assert.ok(errors.some(error => error.includes('public/assets/js/control.js') && error.includes('documents parameter message but declares value')))
+})
+
 function createProjectFixture(t, overrides = {}) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'vipos-docs-'))
   t.after(() => fs.rmSync(projectRoot, { force: true, recursive: true }))
@@ -192,6 +286,7 @@ function createProjectFixture(t, overrides = {}) {
   write(projectRoot, '.env.example', 'DOCUMENTED_VALUE=example\n')
   write(projectRoot, 'app.js', overrides.app || 'const value = process.env.DOCUMENTED_VALUE\nmodule.exports = value\n')
   fs.mkdirSync(path.join(projectRoot, 'modules'), { recursive: true })
+  if (overrides.browser) write(projectRoot, 'public/assets/js/control.js', overrides.browser)
   fs.mkdirSync(path.join(projectRoot, 'scripts'), { recursive: true })
   if (overrides.contracts) write(projectRoot, 'types/contracts.d.ts', overrides.contracts)
 

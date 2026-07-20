@@ -347,7 +347,6 @@ function createObsService({
     getDiscovery,
     getStatus,
     mediaAction,
-    obs,
     setInputMute,
     setSourceVisibility,
     switchScene,

@@ -2,17 +2,16 @@ const { normalizeCompletionDelay } = require('../utils/completion-delay')
 const { userInputError } = require('../utils/errors')
 
 /** @typedef {import('../../types/action-queue').ActionQueue} ActionQueue */
+/** @typedef {import('../../types/action-queue').ActionQueueOptions} ActionQueueOptions */
 /** @typedef {import('../../types/action-queue').QueueRequest} QueueRequest */
 /** @typedef {import('../../types/action-queue').QueueSnapshot} QueueSnapshot */
 
 /**
  * Creates a serial action queue that records execution history and waits for sound completion when needed.
  *
- * @param {object} options Queue dependencies and timing settings.
- * @param {object} options.actions Action runner exposing `run` and optionally `validateStructure`.
- * @param {number} [options.soundCompletionBufferMs=250] Extra milliseconds added after a known sound duration.
- * @param {number} [options.soundCompletionFallbackMs=4000] Delay used when a sound duration cannot be determined.
+ * @param {ActionQueueOptions} [options={}] Queue dependencies and timing settings.
  * @returns {ActionQueue} Queue controls and a snapshot-based status accessor.
+ * @throws {Error} Throws when an action runner is not supplied.
  */
 function createActionQueue({
   actions,
@@ -35,9 +34,7 @@ function createActionQueue({
   /**
    * Adds actions to the queue and initiates background processing unless it is paused.
    *
-   * @param {QueueRequest} item Queued action definition.
-   * @param {object|Array<object>} item.actions Action or action list; validated first when the runner exposes `validateStructure`.
-   * @param {number} [item.completionDelayMs] Explicit post-run delay in milliseconds; `delayMs` is accepted as an alias.
+   * @param {QueueRequest} item Queue request with actions and optional completion-delay settings.
    * @returns {QueueSnapshot} Immediate queue snapshot; action completion is reported later through queue status and history.
    * @throws {Error} Throws when actions are missing or fail runner validation.
    */

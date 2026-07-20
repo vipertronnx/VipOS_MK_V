@@ -195,7 +195,7 @@ Examples must contain safe, distributable values and must not include secrets or
 
 Shared service APIs, queue snapshots, Twitch contexts, and OBS discovery results must use the declaration-only contracts under `types/` in their JSDoc. Method comments should describe behavior, side effects, and error conditions without repeating contract property lists.
 
-`npm run check:docs` validates documented function parameters, async return annotations, and directly inferable return shapes. Keep JSDoc tags synchronized with implementation signatures.
+`npm run check:types` compiles declaration-only contracts. `npm run check:docs` validates JSDoc type references, documented function parameters, async return annotations, and directly inferable return shapes across server and browser JavaScript. Keep JSDoc tags synchronized with implementation signatures.
 
 ## Change checklist
 

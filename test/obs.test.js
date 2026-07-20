@@ -84,6 +84,17 @@ test('OBS media actions reject unknown commands', () => {
   )
 })
 
+test('OBS service does not expose its raw WebSocket client', async () => {
+  await withObsEnvironment(async () => {
+    const obs = createObsService({
+      logger: { error() {}, log() {}, warn() {} },
+      obsClient: createObsClient()
+    })
+
+    assert.equal(Object.hasOwn(obs, 'obs'), false)
+  })
+})
+
 test('intentional OBS disconnect clears reconnect state without scheduling a retry', async () => {
   await withObsEnvironment(async () => {
     const client = createObsClient()

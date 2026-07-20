@@ -163,7 +163,7 @@ function checkJSDocReturnTypes(projectRoot, errors) {
   const typeFiles = findFiles(path.join(projectRoot, 'types'), file => file.endsWith('.d.ts'))
   const program = ts.createProgram([...sourceFiles, ...typeFiles], {
     allowJs: true,
-    checkJs: false,
+    checkJs: true,
     module: ts.ModuleKind.Node16,
     moduleResolution: ts.ModuleResolutionKind.Node16,
     noEmit: true,
@@ -172,10 +172,29 @@ function checkJSDocReturnTypes(projectRoot, errors) {
   })
   const checker = program.getTypeChecker()
 
+  checkJSDocTypeDiagnostics(program, new Set(sourceFiles.map(file => path.resolve(file))), projectRoot, errors)
+
   for (const file of sourceFiles) {
     const source = program.getSourceFile(file)
     if (source) visitReturnTypes(source, source, file, projectRoot, checker, errors)
   }
+}
+
+function checkJSDocTypeDiagnostics(program, sourceFiles, projectRoot, errors) {
+  for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
+    if (!diagnostic.file || diagnostic.start === undefined || !sourceFiles.has(path.resolve(diagnostic.file.fileName))) continue
+    if (!isJSDocPosition(diagnostic.file, diagnostic.start)) continue
+
+    const line = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start).line + 1
+    const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')
+    errors.push(`${relative(diagnostic.file.fileName, projectRoot)}:${line} has an invalid JSDoc type: ${message}`)
+  }
+}
+
+function isJSDocPosition(source, position) {
+  const commentStart = source.text.lastIndexOf('/**', position)
+  const commentEnd = source.text.indexOf('*/', commentStart)
+  return commentStart !== -1 && commentEnd !== -1 && position <= commentEnd
 }
 
 function visitReturnTypes(node, source, file, projectRoot, checker, errors) {
@@ -184,7 +203,7 @@ function visitReturnTypes(node, source, file, projectRoot, checker, errors) {
 }
 
 function checkFunctionReturnTypes(node, source, file, projectRoot, checker, errors) {
-  const returnTag = getDirectJSDocTags(node).find(tag => tag.tagName.text === 'returns' || tag.tagName.text === 'return')
+  const returnTag = getAllJSDocTags(node).find(tag => tag.tagName.text === 'returns' || tag.tagName.text === 'return')
   if (!returnTag || !returnTag.typeExpression) return
 
   const documentedType = returnTag.typeExpression.type
@@ -193,7 +212,8 @@ function checkFunctionReturnTypes(node, source, file, projectRoot, checker, erro
 
   const expectedType = checker.getTypeFromTypeNode(expectedTypeNode)
   for (const expression of getReturnExpressions(node)) {
-    const actualType = checker.getTypeAtLocation(expression)
+    const expressionType = checker.getTypeAtLocation(expression)
+    const actualType = isAsyncFunction(node) ? checker.getAwaitedType(expressionType) || expressionType : expressionType
     if (isUncheckedType(actualType) || checker.isTypeAssignableTo(actualType, expectedType)) continue
 
     addJSDocError(
@@ -205,10 +225,6 @@ function checkFunctionReturnTypes(node, source, file, projectRoot, checker, erro
       `${getFunctionName(node, source)} returns ${checker.typeToString(actualType)} but its @returns type is ${checker.typeToString(expectedType)}`
     )
   }
-}
-
-function getDirectJSDocTags(node) {
-  return (node.jsDoc || []).flatMap(comment => comment.tags ? [...comment.tags] : [])
 }
 
 function getPromiseValueTypeNode(typeNode) {
@@ -241,6 +257,10 @@ function isStaticallyComparableType(typeNode) {
 }
 
 function getReturnExpressions(functionNode) {
+  if (ts.isArrowFunction(functionNode) && !ts.isBlock(functionNode.body)) {
+    return [functionNode.body]
+  }
+
   const expressions = []
 
   function visit(node) {
@@ -365,7 +385,7 @@ function getBindingPropertyNames(pattern) {
 }
 
 function getTagName(tag, source) {
-  return tag.name ? tag.name.getText(source).replace(/^\[|\]$/g, '') : ''
+  return tag.name ? tag.name.getText(source).replace(/^\[|\]$/g, '').replace(/=.*/, '') : ''
 }
 
 function getReturnTypeText(tag, source) {
@@ -385,19 +405,7 @@ function isAsyncFunction(node) {
 }
 
 function hasValueReturnStatement(functionNode) {
-  let hasValueReturn = false
-
-  function visit(node) {
-    if (node !== functionNode && isDocumentableFunction(node)) return
-    if (ts.isReturnStatement(node) && node.expression) {
-      hasValueReturn = true
-      return
-    }
-    ts.forEachChild(node, visit)
-  }
-
-  visit(functionNode.body)
-  return hasValueReturn
+  return getReturnExpressions(functionNode).length > 0
 }
 
 function getFunctionName(node, source) {
@@ -415,6 +423,7 @@ function findJavaScriptFiles(projectRoot) {
   return [
     path.join(projectRoot, 'app.js'),
     ...findFiles(path.join(projectRoot, 'modules'), file => file.endsWith('.js')),
+    ...findFiles(path.join(projectRoot, 'public', 'assets', 'js'), file => file.endsWith('.js')),
     ...findFiles(path.join(projectRoot, 'scripts'), file => file.endsWith('.js'))
   ].filter(file => fs.existsSync(file))
 }
