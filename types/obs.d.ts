@@ -45,6 +45,7 @@ export interface ObsService {
   getDiscovery(): Promise<ObsDiscovery>
   getStatus(): ObsStatus
   mediaAction(inputName: string, action: string): Promise<void>
+  onCurrentSceneChanged(listener: (sceneName: string) => void): () => void
   setInputMute(inputName: string, inputMuted: boolean): Promise<void>
   setSourceVisibility(sceneName: string | undefined, sourceName: string, sceneItemEnabled: boolean): Promise<void>
   switchScene(sceneName: string): Promise<void>

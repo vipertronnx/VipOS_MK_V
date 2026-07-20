@@ -212,3 +212,53 @@ test('unexpected OBS disconnects continue to schedule reconnects', async () => {
     assert.equal(timers.scheduled.length, 1)
   })
 })
+
+test('OBS service publishes distinct program-scene changes from reads, events, and requests', async () => {
+  await withObsEnvironment(async () => {
+    const client = createObsClient()
+    client.call = async requestType => {
+      if (requestType === 'GetCurrentProgramScene') return { currentProgramSceneName: 'Starting Soon' }
+      return {}
+    }
+    const obs = createObsService({
+      logger: { error() {}, log() {}, warn() {} },
+      obsClient: client
+    })
+    const scenes = []
+    const unsubscribe = obs.onCurrentSceneChanged(sceneName => scenes.push(sceneName))
+
+    await obs.getCurrentScene()
+    client.emit('CurrentProgramSceneChanged', { sceneName: 'Gameplay' })
+    await obs.switchScene('Intermission')
+    client.emit('CurrentProgramSceneChanged', { sceneName: 'Intermission' })
+    unsubscribe()
+    client.emit('CurrentProgramSceneChanged', { sceneName: 'Credits' })
+
+    assert.deepEqual(scenes, ['Starting Soon', 'Gameplay', 'Intermission'])
+    assert.equal(obs.getStatus().currentScene, 'Credits')
+  })
+})
+
+test('OBS scene listeners receive the cached scene on subscription and cannot disrupt OBS state', async () => {
+  await withObsEnvironment(async () => {
+    const client = createObsClient()
+    client.call = async () => ({ currentProgramSceneName: 'Gameplay' })
+    const errors = []
+    const obs = createObsService({
+      logger: { error(message) { errors.push(message) }, log() {}, warn() {} },
+      obsClient: client
+    })
+
+    await obs.getCurrentScene()
+    const received = []
+    obs.onCurrentSceneChanged(sceneName => received.push(sceneName))
+    obs.onCurrentSceneChanged(() => {
+      throw new Error('listener failure')
+    })
+    client.emit('CurrentProgramSceneChanged', { sceneName: 'Intermission' })
+
+    assert.deepEqual(received, ['Gameplay', 'Intermission'])
+    assert.equal(obs.getStatus().currentScene, 'Intermission')
+    assert.deepEqual(errors, ['OBS scene listener failed: listener failure', 'OBS scene listener failed: listener failure'])
+  })
+})

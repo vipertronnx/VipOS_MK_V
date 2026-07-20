@@ -17,6 +17,7 @@ const { normalizeCompletionDelay } = require('./modules/utils/completion-delay')
 const { createGreetingService } = require('./modules/actions/greetings')
 const { createMacroService } = require('./modules/actions/macros')
 const { createObsService } = require('./modules/obs')
+const { createLowerThirdSync, parseAlwaysVisibleObsScenes } = require('./modules/overlays/lower-third')
 const { createRaffleService } = require('./modules/chat/chat-raffles')
 const { parseBool } = require('./modules/utils/value-normalization')
 
@@ -30,6 +31,7 @@ const NEWS_CHYRON_ROTATE_INTERVAL_MS = numberOrDefault(process.env.NEWS_CHYRON_R
 const NEWS_CHYRON_ITEMS_DEFAULT = process.env.NEWS_CHYRON_ITEMS_DEFAULT || 'config/examples/news-chyron.example.json'
 const NEWS_CHYRON_ITEMS = readNewsChyronItems()
 const LOWER_THIRD_TOGGLE_INTERVAL_MS = numberOrDefault(process.env.LOWER_THIRD_TOGGLE_INTERVAL_MS, 3 * 60 * 1000)
+const LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES = parseAlwaysVisibleObsScenes(process.env.LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES)
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE, '140px')
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION = cssTimeOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION, '600ms')
 const VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE, '100%')
@@ -69,8 +71,15 @@ function createSocketServer(server, { port = PORT, portContext = createPortConte
  */
 function createRuntimeServices({ io }) {
   const quietMode = createQuietMode()
-  const lowerThirdSync = createLowerThirdSync(io, LOWER_THIRD_TOGGLE_INTERVAL_MS)
+  const lowerThirdSync = createLowerThirdSync({
+    alwaysVisibleObsScenes: LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES,
+    io,
+    toggleIntervalMs: LOWER_THIRD_TOGGLE_INTERVAL_MS
+  })
   const obs = createObsService()
+  const unsubscribeLowerThirdSceneSync = obs.onCurrentSceneChanged(sceneName => {
+    lowerThirdSync.setCurrentObsScene(sceneName)
+  })
   const greetings = createGreetingService()
   const actions = createActionRunner({ io, obs, greetings, quietMode, overlayEmit: lowerThirdSync.emitOverlayEvent })
   const actionQueue = createActionQueue({
@@ -111,7 +120,8 @@ function createRuntimeServices({ io }) {
     macros,
     obs,
     quietMode,
-    raffle
+    raffle,
+    unsubscribeLowerThirdSceneSync
   }
 }
 
@@ -141,11 +151,12 @@ async function startRuntimeServices({ chat, obs, raffle }, { shouldContinue = ()
  * @returns {Promise<void>}
  * @throws {AggregateError} Throws after attempting all cleanup operations when one or more fail.
  */
-async function stopRuntimeServices({ chat, lowerThirdSync, obs, raffle } = {}) {
+async function stopRuntimeServices({ chat, lowerThirdSync, obs, raffle, unsubscribeLowerThirdSceneSync } = {}) {
   const errors = []
   const cleanup = [
     () => raffle?.stopTimers?.(),
     () => chat?.stop?.(),
+    () => unsubscribeLowerThirdSceneSync?.(),
     () => lowerThirdSync?.stop?.(),
     () => obs?.disconnect?.()
   ]
@@ -185,68 +196,6 @@ function createQuietMode() {
     isEnabled: () => enabled,
     set,
     toggle: () => set(!enabled)
-  }
-}
-
-function createLowerThirdSync(io, toggleIntervalMs) {
-  let hidden = false
-  let timer = null
-
-  function emitState(event = 'lower-third-toggle') {
-    io.emit(event, { hidden })
-  }
-
-  function setHidden(nextHidden, event) {
-    hidden = Boolean(nextHidden)
-    emitState(event)
-    return getStatus()
-  }
-
-  function toggle() {
-    hidden = !hidden
-    emitState()
-    return getStatus()
-  }
-
-  function emitOverlayEvent(event, payload = {}) {
-    if (event === 'lower-third-hide') return setHidden(true, event)
-    if (event === 'lower-third-show') return setHidden(false, event)
-    if (event === 'lower-third-toggle') {
-      if (payload && typeof payload.hidden === 'boolean') return setHidden(payload.hidden, event)
-      return toggle()
-    }
-
-    io.emit(event, payload)
-  }
-
-  function getStatus() {
-    return {
-      hidden,
-      toggleIntervalMs
-    }
-  }
-
-  io.on('connection', socket => {
-    socket.emit('lower-third-sync', { hidden })
-    socket.on('lower-third-sync-request', () => {
-      socket.emit('lower-third-sync', { hidden })
-    })
-  })
-
-  if (toggleIntervalMs > 0) {
-    timer = setInterval(toggle, toggleIntervalMs)
-  }
-
-  return {
-    getStatus,
-    emitOverlayEvent,
-    hide: () => setHidden(true, 'lower-third-hide'),
-    show: () => setHidden(false, 'lower-third-show'),
-    stop: () => {
-      if (timer) clearInterval(timer)
-      timer = null
-    },
-    toggle
   }
 }
 

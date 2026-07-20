@@ -25,6 +25,7 @@ function createObsService({
   let lifecyclePromise = Promise.resolve()
   let lifecycleVersion = 0
   let shouldRun = false
+  const sceneListeners = new Set()
 
   const state = {
     enabled: process.env.OBS_ENABLED !== 'false' && Boolean(address),
@@ -61,8 +62,37 @@ function createObsService({
   })
 
   obs.on('CurrentProgramSceneChanged', data => {
-    state.currentScene = data.sceneName
+    updateCurrentScene(data.sceneName)
   })
+
+  /**
+   * Subscribes to distinct OBS program-scene changes.
+   *
+   * @param {(sceneName: string) => void} listener Callback invoked after the cached current scene changes.
+   * @returns {() => void} Removes the listener.
+   */
+  function onCurrentSceneChanged(listener) {
+    if (typeof listener !== 'function') throw new TypeError('OBS scene listener must be a function')
+    sceneListeners.add(listener)
+    if (state.currentScene) notifySceneListener(listener, state.currentScene)
+    return () => sceneListeners.delete(listener)
+  }
+
+  function updateCurrentScene(sceneName) {
+    if (typeof sceneName !== 'string' || !sceneName || state.currentScene === sceneName) return
+    state.currentScene = sceneName
+    for (const listener of sceneListeners) {
+      notifySceneListener(listener, sceneName)
+    }
+  }
+
+  function notifySceneListener(listener, sceneName) {
+    try {
+      listener(sceneName)
+    } catch (error) {
+      logger.error(`OBS scene listener failed: ${error.message}`)
+    }
+  }
 
   /**
    * Queues a connection attempt and enables reconnects after unexpected connection loss.
@@ -178,7 +208,7 @@ function createObsService({
    */
   async function getCurrentScene() {
     const data = await call('GetCurrentProgramScene')
-    state.currentScene = data.currentProgramSceneName
+    updateCurrentScene(data.currentProgramSceneName)
     return data.currentProgramSceneName
   }
 
@@ -222,8 +252,11 @@ function createObsService({
       }
     }))
 
+    const currentScene = sceneData.currentProgramSceneName || state.currentScene
+    updateCurrentScene(currentScene)
+
     return {
-      currentScene: sceneData.currentProgramSceneName || state.currentScene,
+      currentScene,
       scenes: sceneItems,
       inputs,
       mediaInputs: inputs.filter(input => ['ffmpeg_source', 'vlc_source'].includes(input.kind))
@@ -239,7 +272,7 @@ function createObsService({
    */
   async function switchScene(sceneName) {
     await call('SetCurrentProgramScene', { sceneName })
-    state.currentScene = sceneName
+    updateCurrentScene(sceneName)
   }
 
   async function getSceneItemId(sceneName, sourceName) {
@@ -347,6 +380,7 @@ function createObsService({
     getDiscovery,
     getStatus,
     mediaAction,
+    onCurrentSceneChanged,
     setInputMute,
     setSourceVisibility,
     switchScene,

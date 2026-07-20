@@ -10,6 +10,7 @@ VipOS MK V is a CommonJS Node.js application. `app.js` is both the executable en
 | `modules/actions/` | Action execution, validation, queueing, macros, and greeting pools. |
 | `modules/chat/` | Twitch authentication, command configuration, EventSub lifecycle and planning, context normalization, automation, retries, and raffle behavior. |
 | `modules/obs.js` | OBS WebSocket connection lifecycle, discovery, and operations. |
+| `modules/overlays/` | Shared overlay-state services, including lower-third visibility policy. |
 | `modules/utils/` | Shared path, JSON persistence, error, value, completion-delay, and audio-duration utilities. |
 | `views/` | EJS pages and overlay templates. |
 | `public/assets/js/` | Browser-side control-panel and overlay event handlers. |

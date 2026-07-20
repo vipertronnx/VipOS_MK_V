@@ -198,10 +198,13 @@ test('runtime shutdown attempts every cleanup operation before reporting failure
         stopTimers() {
           calls.push('raffle')
         }
+      },
+      unsubscribeLowerThirdSceneSync() {
+        calls.push('scene-sync')
       }
     }),
     error => error instanceof AggregateError && error.errors.length === 1 && error.errors[0].message === 'chat stop failed'
   )
 
-  assert.deepEqual(calls, ['raffle', 'chat', 'lower-third', 'obs'])
+  assert.deepEqual(calls, ['raffle', 'chat', 'scene-sync', 'lower-third', 'obs'])
 })

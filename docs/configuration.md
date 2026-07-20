@@ -88,8 +88,11 @@ Sound paths are relative to `public/assets/sounds/` and may point into subdirect
 | `VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE` | `100%` | Venom Coin slide distance. |
 | `VENOM_COIN_LOWER_THIRD_SLIDE_DURATION` | `300ms` | Venom Coin slide duration. |
 | `LOWER_THIRD_TOGGLE_INTERVAL_MS` | `180000` | Shared automatic hide/show interval for the news chyron and Venom Coin. Set to `0` to disable the timer. |
+| `LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` | Empty | JSON array of exact OBS program-scene names that force both the news chyron and Venom Coin visible. |
 
 Slide distances accept numeric `px`, `%`, `vh`, `vw`, `rem`, or `em` values. Slide durations accept numeric `ms` or `s` values. Invalid values use their defaults.
+
+`LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` must be a JSON array such as `["Gameplay","Just Chatting"]`. While OBS is on one of those program scenes, the shared lower-third timer is paused and both overlays remain visible. Leaving the configured scenes restarts the full shared interval. Scene names match exactly, and changes require an application restart.
 
 ### Raffle overrides
 
