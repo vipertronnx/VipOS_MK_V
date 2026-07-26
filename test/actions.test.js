@@ -248,6 +248,37 @@ test('action definitions execute every supported action type', async () => {
   })
 })
 
+test('context picker stores a value from a file-backed catalog', async () => {
+  const picks = []
+  const actions = createActionRunner({
+    greetings: {
+      pick(options) {
+        picks.push(options)
+        return { pool: 'all', value: 'Kappa' }
+      }
+    },
+    io: { emit() {} },
+    logger: { error() {}, log() {}, warn() {} },
+    obs: {}
+  })
+  const context = {}
+
+  const results = await actions.run({
+    type: 'context.pickRandom',
+    contextKey: 'emote',
+    file: 'emotes.json'
+  }, context)
+
+  assert.deepEqual(picks, [{ file: 'emotes.json', pool: undefined }])
+  assert.deepEqual(results, [{
+    type: 'context.pickRandom',
+    contextKey: 'emote',
+    pool: 'all',
+    value: 'Kappa'
+  }])
+  assert.equal(context.emote, 'Kappa')
+})
+
 test('quiet mode suppresses the action definitions marked as quietable', async () => {
   const emitted = []
   const logs = []

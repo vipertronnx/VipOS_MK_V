@@ -120,6 +120,7 @@ Slide distances accept numeric `px`, `%`, `vh`, `vw`, `rem`, or `em` values. Sli
 | Local file | Tracked example | Behavior when local file is absent |
 | --- | --- | --- |
 | `config/commands.json` | `config/examples/commands.example.json` | The running Twitch service has no commands or event handlers. The dry-run simulator uses the example. |
+| `config/emotes.json` | `config/examples/emotes.example.json` | File-backed text used by actions that select a random emote. |
 | `config/macros.json` | `config/examples/macros.example.json` | The macro service uses the tracked example. |
 | `config/greetings.json` | `config/examples/greetings.example.json` | The greeting service uses the tracked example. |
 | `config/greetings-settings.json` | `config/examples/greetings-settings.example.json` | The greeting catalog's default pool is active. |
@@ -145,6 +146,24 @@ Use an explicit `id` when another system calls the macro API. `description` is o
 `config/greetings.json` can be a string array or an object with `defaultPool` and `pools`. The control panel writes the selected pool to `config/greetings-settings.json`.
 
 `context.pickRandom` uses the active greeting pool unless the action supplies an inline `items` list, a `pool` or `theme`, or a JSON `file` within `config/`.
+
+`config/emotes.json` is a string array of chat-emote text. Use it in a chat entry (or any other action sequence) without changing the active greeting pool:
+
+```json
+{
+  "chatEntries": [{
+    "name": "mod-or-vip-entry",
+    "match": { "roles": ["moderator", "vip"] },
+    "actions": [
+      { "type": "context.pickRandom", "contextKey": "greeting" },
+      { "type": "context.pickRandom", "contextKey": "emote", "file": "emotes.json" },
+      { "type": "overlay.alert", "message": "Yo {displayName}! HEY {greeting} {emote}" }
+    ]
+  }]
+}
+```
+
+The selected value is available at `{emote}` to every later action in the same sequence. A missing local catalog uses `config/examples/emotes.example.json`.
 
 `config/welcome-followers.json` is a dedicated string-array catalog for follower welcome messages. The default `new-follower` handler stores a selected entry at `{welcomeFollower}` before sending its chyron alert. A missing local catalog uses `config/examples/welcome-followers.example.json`.
 

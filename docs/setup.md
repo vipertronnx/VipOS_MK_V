@@ -35,6 +35,7 @@ Files directly under `config/` are ignored by Git. For a new installation, copy 
 
 ```powershell
 Copy-Item config/examples/commands.example.json config/commands.json
+Copy-Item config/examples/emotes.example.json config/emotes.json
 Copy-Item config/examples/greetings.example.json config/greetings.json
 Copy-Item config/examples/greetings-settings.example.json config/greetings-settings.json
 Copy-Item config/examples/macros.example.json config/macros.json
@@ -45,7 +46,7 @@ Copy-Item config/examples/tv-guide.example.json config/tv-guide.json
 Copy-Item config/examples/welcome-followers.example.json config/welcome-followers.json
 ```
 
-See [Configuration](configuration.md) before editing these files. The application has tracked example fallbacks for macros, greetings, sound labels, follower welcome text, the news chyron, and the TV Guide. Twitch commands do not use the tracked example as a runtime fallback; copy `commands.example.json` when Twitch automation is needed.
+See [Configuration](configuration.md) before editing these files. The application has tracked example fallbacks for macros, greetings, emotes, sound labels, follower welcome text, the news chyron, and the TV Guide. Twitch commands do not use the tracked example as a runtime fallback; copy `commands.example.json` when Twitch automation is needed.
 
 Do not overwrite existing local configuration. In particular, `config/raffle.json` can contain live raffle state, user points, and history.
 

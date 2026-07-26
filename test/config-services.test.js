@@ -14,22 +14,30 @@ const {
   DEFAULT_MACROS_EXAMPLE_FILE
 } = require('../modules/actions/macros')
 
-test('tracked macro and greeting examples load through their services', () => {
+test('tracked macro, greeting, and emote examples load through their services', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vipos-config-services-'))
+  const emotesExample = path.join(__dirname, '..', 'config', 'examples', 'emotes.example.json')
 
   try {
     assert.equal(fs.existsSync(DEFAULT_MACROS_EXAMPLE_FILE), true)
     assert.equal(fs.existsSync(DEFAULT_GREETINGS_EXAMPLE_FILE), true)
+    assert.equal(fs.existsSync(emotesExample), true)
 
     const macros = createMacroService({ macrosFile: DEFAULT_MACROS_EXAMPLE_FILE }).list()
     const greetings = createGreetingService({
       greetingsFile: DEFAULT_GREETINGS_EXAMPLE_FILE,
       settingsFile: path.join(directory, 'greetings-settings.json')
     }).getStatus()
+    const emote = createGreetingService({
+      greetingsFile: emotesExample,
+      settingsFile: path.join(directory, 'emotes-settings.json')
+    }).pick()
 
     assert.ok(macros.length > 0)
     assert.ok(greetings.activePool)
     assert.ok(greetings.pools.length > 0)
+    assert.equal(emote.pool, 'all')
+    assert.ok(emote.value)
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })
   }
@@ -38,6 +46,14 @@ test('tracked macro and greeting examples load through their services', () => {
 test('welcome-follower catalog resolves to its tracked example when the local file is absent', () => {
   const localCatalog = path.join(__dirname, '..', 'config', 'welcome-followers.json')
   const expectedExample = path.join(__dirname, '..', 'config', 'examples', 'welcome-followers.example.json')
+
+  assert.equal(getCatalogExampleFile(localCatalog), expectedExample)
+  assert.equal(fs.existsSync(expectedExample), true)
+})
+
+test('emote catalog resolves to its tracked example when the local file is absent', () => {
+  const localCatalog = path.join(__dirname, '..', 'config', 'emotes.json')
+  const expectedExample = path.join(__dirname, '..', 'config', 'examples', 'emotes.example.json')
 
   assert.equal(getCatalogExampleFile(localCatalog), expectedExample)
   assert.equal(fs.existsSync(expectedExample), true)
