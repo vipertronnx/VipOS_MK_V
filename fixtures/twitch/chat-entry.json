@@ -1,0 +1,18 @@
+{
+  "badges": {
+    "vip": "1"
+  },
+  "broadcasterDisplayName": "vipertronnx",
+  "broadcasterId": "987654321",
+  "broadcasterName": "vipertronnx",
+  "chatterDisplayName": "Simulated VIP",
+  "chatterId": "simulated-vip-entry-1",
+  "chatterName": "simulatedvip",
+  "color": "#9147ff",
+  "isCheer": false,
+  "isRedemption": false,
+  "messageId": "simulated-vip-entry-message-1",
+  "messageText": "Hello from a simulated VIP entry",
+  "messageType": "text",
+  "rewardId": null
+}

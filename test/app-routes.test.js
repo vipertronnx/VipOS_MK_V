@@ -398,6 +398,33 @@ async function waitForQueueHistory(actionQueue, predicate, timeoutMs = 1000) {
   assert.fail('Timed out waiting for queue history')
 }
 
+test('/api/v1/twitch/simulate forwards a chat-entry message payload', async () => {
+  const { services } = createFakeServices()
+  const calls = []
+  services.chat.simulateEvent = async (type, event) => {
+    calls.push({ event, type })
+  }
+  const app = createApp(services)
+  const event = {
+    badges: { vip: '1' },
+    chatterId: 'vip-1',
+    messageText: 'Hello'
+  }
+
+  await withTestServer(app, async baseUrl => {
+    const { payload, response } = await postJson(baseUrl, '/api/v1/twitch/simulate/chat.entry', event)
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(payload, {
+      event: 'chat.entry',
+      ok: true,
+      queue: services.actionQueue.getStatus()
+    })
+  })
+
+  assert.deepEqual(calls, [{ event, type: 'chat.entry' }])
+})
+
 test('/api/v1/sound rejects missing files before enqueueing', async () => {
   const { enqueued, services } = createFakeServices()
   const app = createApp(services)

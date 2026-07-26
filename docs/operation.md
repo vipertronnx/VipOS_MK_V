@@ -109,9 +109,24 @@ Random SFX selection has a narrower pool: only top-level files listed by name in
 
 ## Simulate Twitch events
 
-The simulator supports follows, raids, subscriptions, and gift subscriptions. A dry run does not connect to Twitch or the running application:
+The simulator supports chat entries, follows, raids, subscriptions, and gift subscriptions. A dry run does not connect to Twitch or the running application. Its general form is:
 
 ```powershell
+npm run simulate:twitch-event -- <event> [fixture.json] [options]
+```
+
+| Simulation | Primary command | Accepted aliases |
+| --- | --- | --- |
+| Chat entry | `chat-entry` | `chatentry`, `entry` |
+| Follow | `follow` | `follower`, `followers` |
+| Raid | `raid` | `raided` |
+| Subscription | `sub` | `subscriber`, `subscribers`, `subscribe`, `subscribed`, `subscription` |
+| Gift subscription | `gift-sub` | `gift`, `giftsub`, `gifted`, `giftedsub`, `gifted-sub` |
+
+For example:
+
+```powershell
+npm run simulate:twitch-event -- chat-entry
 npm run simulate:twitch-event -- follow
 npm run simulate:twitch-event -- raid
 npm run simulate:twitch-event -- sub
@@ -120,16 +135,29 @@ npm run simulate:twitch-event -- gift-sub --count 5
 
 Dry runs use `CHAT_COMMANDS_FILE` when it is set, then `config/commands.json` when that file exists, and otherwise `config/examples/commands.example.json`. They print simulated overlay, chat, and OBS actions to the terminal.
 
-To send the event to a running VipOS MK V instance and connected browser sources, add `--live`:
+To send any simulation to a running VipOS MK V instance and connected browser sources, add `--live`:
 
 ```powershell
+npm run simulate:twitch-event -- chat-entry --live
 npm run simulate:twitch-event -- follow --live
 npm run simulate:twitch-event -- raid --live
 npm run simulate:twitch-event -- sub --live
 npm run simulate:twitch-event -- gift-sub --count 5 --live
 ```
 
-The simulator accepts a fixture path immediately after the event type. It also supports `--tier VALUE` and `--url http://127.0.0.1:PORT`. Tracked default fixtures live under `fixtures/twitch/`.
+| Option | Applies to | Behavior |
+| --- | --- | --- |
+| `[fixture.json]` | Any simulation | Replaces the tracked default fixture for that event. |
+| `--live` | Any simulation | Posts the fixture to the running local application instead of running it in the CLI process. |
+| `--url http://127.0.0.1:PORT` | Any `--live` simulation | Sets the local application URL; the default uses `PORT` or `5000`. |
+| `--count VALUE` | Gift subscription | Replaces the gifted-subscription amount. |
+| `--tier VALUE` | Subscription or gift subscription | Replaces the subscription tier. |
+| `--role moderator\|vip` | Chat entry | Replaces the fixture's moderator/VIP badge. `mod` is accepted as an alias for `moderator`. |
+| `--user-id VALUE` | Chat entry | Replaces the chatter ID and generated message ID. |
+
+The default chat-entry fixture is a VIP, so it exercises `mod-or-vip-entry` without also matching moderator-only handlers. Chat entries are intentionally processed only once per user ID during a running bot session; use `--user-id another-test-user` for another live test without restarting the service.
+
+Tracked default fixtures live under `fixtures/twitch/`.
 
 ## Local API requirements
 

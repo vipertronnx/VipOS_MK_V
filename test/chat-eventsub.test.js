@@ -837,6 +837,65 @@ test('privileged chat entries queue matching handlers once per viewer', async ()
   })
 })
 
+test('simulated chat entries use the chat-message path and preserve first-seen behavior', async () => {
+  const actions = [{ type: 'overlay.alert', message: 'Welcome' }]
+
+  await withChatAutomationHarness({
+    chatEntries: [
+      {
+        actions,
+        match: { roles: ['moderator', 'vip'] },
+        name: 'mod-or-vip-entry'
+      }
+    ]
+  }, async ({ chat, queued }) => {
+    const vipEntry = createChatMessage({
+      badges: { vip: '1' },
+      displayName: 'VIP',
+      message: 'Hello',
+      userId: 'vip-1',
+      username: 'vip'
+    })
+
+    await chat.simulateEvent('chat-entry', vipEntry)
+    await chat.simulateEvent('chat.entry', vipEntry)
+    await chat.simulateEvent('entry', createChatMessage({
+      badges: { moderator: '1' },
+      displayName: 'Moderator',
+      message: 'Hello',
+      userId: 'moderator-1',
+      username: 'moderator'
+    }))
+
+    assert.equal(queued.length, 2)
+    assert.deepEqual(queued.map(item => ({
+      name: item.name,
+      roles: item.context.roles,
+      simulated: item.context.simulated,
+      source: item.source,
+      userId: item.context.userId
+    })), [
+      {
+        name: 'Twitch chat.entry mod-or-vip-entry',
+        roles: ['everyone', 'vip'],
+        simulated: true,
+        source: 'chat-entry',
+        userId: 'vip-1'
+      },
+      {
+        name: 'Twitch chat.entry mod-or-vip-entry',
+        roles: ['everyone', 'moderator'],
+        simulated: true,
+        source: 'chat-entry',
+        userId: 'moderator-1'
+      }
+    ])
+    assert.equal(chat.getStatus().messageCount, 3)
+    assert.equal(chat.getStatus().chatEntryCount, 2)
+    assert.equal(chat.getStatus().lastChatEntryMatchedHandlers, 1)
+  })
+})
+
 test('raid callbacks queue matching handlers and respect handler cooldowns', async () => {
   const incomingRaidActions = [{ type: 'overlay.alert', message: 'Incoming raid' }]
   const largeRaidActions = [{ type: 'overlay.alert', message: 'Large raid' }]
