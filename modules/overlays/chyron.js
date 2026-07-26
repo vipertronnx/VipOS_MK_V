@@ -32,18 +32,20 @@ function parseAlwaysVisibleObsScenes(value, {
  *
  * @param {object} options Service dependencies and configuration.
  * @param {object} options.io Socket.IO server used to emit overlay events.
- * @param {number} options.toggleIntervalMs Interval between automatic visibility toggles.
+ * @param {number} options.visibleDurationMs Time the shared lower third remains visible before automatically hiding.
+ * @param {number} options.hiddenDurationMs Time the shared lower third remains hidden before automatically showing.
  * @param {string[]} [options.alwaysVisibleObsScenes=[]] OBS scenes that force the shared lower third visible.
- * @param {Function} [options.setTimer=setInterval] Interval scheduler, injected for tests.
- * @param {Function} [options.clearTimer=clearInterval] Interval cleanup function, injected for tests.
+ * @param {Function} [options.setTimer=setTimeout] Timeout scheduler, injected for tests.
+ * @param {Function} [options.clearTimer=clearTimeout] Timeout cleanup function, injected for tests.
  * @returns {object} Shared lower-third state and controls.
  */
 function createLowerThirdSync({
   io,
-  toggleIntervalMs,
+  visibleDurationMs,
+  hiddenDurationMs,
   alwaysVisibleObsScenes = [],
-  setTimer = setInterval,
-  clearTimer = clearInterval
+  setTimer = setTimeout,
+  clearTimer = clearTimeout
 }) {
   const configuredScenes = normalizeSceneNames(alwaysVisibleObsScenes)
   const alwaysVisibleSceneSet = new Set(configuredScenes)
@@ -62,8 +64,15 @@ function createLowerThirdSync({
   }
 
   function startTimer() {
-    if (timer !== null || forcedVisible || toggleIntervalMs <= 0) return
-    timer = setTimer(toggle, toggleIntervalMs)
+    if (timer !== null || forcedVisible) return
+
+    const durationMs = hidden ? hiddenDurationMs : visibleDurationMs
+    if (durationMs <= 0) return
+
+    timer = setTimer(() => {
+      timer = null
+      toggle()
+    }, durationMs)
   }
 
   function restartTimer() {
@@ -76,28 +85,24 @@ function createLowerThirdSync({
 
     hidden = Boolean(nextHidden)
     emitState(event)
+    restartTimer()
     return getStatus()
   }
 
   function toggle() {
     if (forcedVisible) return getStatus()
 
-    hidden = !hidden
-    emitState()
-    return getStatus()
+    return setHidden(!hidden, 'lower-third-toggle')
   }
 
   function show() {
-    hidden = false
-    emitState('lower-third-show')
-    restartTimer()
-    return getStatus()
+    return setHidden(false, 'lower-third-show')
   }
 
   /**
    * Applies the program-scene policy to the shared lower-third state.
    * Entering a configured scene makes both overlays visible and pauses the timer.
-   * Leaving one makes both visible and restarts the interval from its full duration.
+   * Leaving one makes both visible and restarts the full visible duration.
    *
    * @param {string|null|undefined} sceneName Active OBS program-scene name.
    * @returns {object} Current lower-third status.
@@ -130,7 +135,8 @@ function createLowerThirdSync({
       forcedVisible,
       hidden,
       timerRunning: timer !== null,
-      toggleIntervalMs
+      hiddenDurationMs,
+      visibleDurationMs
     }
   }
 
