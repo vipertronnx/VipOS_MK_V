@@ -178,6 +178,7 @@ function normalizeEventName(value) {
     automatic: 'automatic-redemption.add',
     automaticRedemption: 'automatic-redemption.add',
     automaticredemption: 'automatic-redemption.add',
+    'chat-entry': 'chat.entry',
     chatEntry: 'chat.entry',
     chatentry: 'chat.entry',
     enter: 'chat.entry',

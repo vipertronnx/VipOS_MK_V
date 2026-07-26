@@ -8,6 +8,9 @@ const { createChatService } = require('../modules/chat/chat')
 const { createGreetingService } = require('../modules/actions/greetings')
 
 const EVENT_ALIASES = {
+  'chat-entry': 'chat.entry',
+  chatentry: 'chat.entry',
+  entry: 'chat.entry',
   follow: 'follow',
   follower: 'follow',
   followers: 'follow',
@@ -28,6 +31,7 @@ const EVENT_ALIASES = {
 }
 
 const DEFAULT_FIXTURES = {
+  'chat.entry': path.join(__dirname, '..', 'fixtures', 'twitch', 'chat-entry.json'),
   follow: path.join(__dirname, '..', 'fixtures', 'twitch', 'follow.json'),
   raid: path.join(__dirname, '..', 'fixtures', 'twitch', 'raid.json'),
   subscription: path.join(__dirname, '..', 'fixtures', 'twitch', 'subscription.json'),
@@ -50,7 +54,7 @@ async function main() {
 
   const fixtureFile = resolveFixtureFile(eventType, options.fixtureFile)
   const event = readJson(fixtureFile)
-  applyFixtureOverrides(event, options)
+  applyFixtureOverrides(event, options, eventType)
 
   if (options.live) {
     await simulateLiveEvent(eventType, event, fixtureFile, options.baseUrl)
@@ -114,7 +118,7 @@ async function main() {
  * Parses the simulation CLI's positional event and fixture arguments plus supported overrides.
  *
  * @param {string[]} args Arguments after the Node script path.
- * @returns {object} Event type, optional fixture, live URL, count, and tier options.
+ * @returns {object} Event type, optional fixture, live URL, count, tier, and chat-entry override options.
  */
 function parseArgs(args) {
   const options = {
@@ -123,7 +127,9 @@ function parseArgs(args) {
     eventType: '',
     fixtureFile: '',
     live: false,
-    tier: ''
+    role: '',
+    tier: '',
+    userId: ''
   }
 
   for (let index = 0; index < args.length; index += 1) {
@@ -135,6 +141,12 @@ function parseArgs(args) {
       index += 1
     } else if (arg === '--tier') {
       options.tier = args[index + 1] || ''
+      index += 1
+    } else if (arg === '--role') {
+      options.role = getRequiredOptionValue(args, index, arg)
+      index += 1
+    } else if (arg === '--user-id') {
+      options.userId = getRequiredOptionValue(args, index, arg)
       index += 1
     } else if (arg === '--url') {
       options.baseUrl = args[index + 1] || options.baseUrl
@@ -149,7 +161,13 @@ function parseArgs(args) {
   return options
 }
 
-function applyFixtureOverrides(event, options) {
+function getRequiredOptionValue(args, index, option) {
+  const value = args[index + 1]
+  if (!value || value.startsWith('--')) throw new Error(`${option} requires a value`)
+  return value
+}
+
+function applyFixtureOverrides(event, options, eventType) {
   if (Number.isFinite(options.count) && options.count > 0) {
     event.amount = Math.round(options.count)
   }
@@ -157,6 +175,33 @@ function applyFixtureOverrides(event, options) {
   if (options.tier) {
     event.tier = options.tier
   }
+
+  if (!options.role && !options.userId) return
+  if (eventType !== 'chat.entry') {
+    throw new Error('--role and --user-id are only supported for chat-entry simulations')
+  }
+
+  if (options.role) {
+    const role = normalizeChatEntryRole(options.role)
+    event.badges = { ...event.badges }
+    delete event.badges.moderator
+    delete event.badges.vip
+    event.badges[role] = '1'
+  }
+
+  if (options.userId) {
+    const userId = String(options.userId).trim()
+    if (!userId) throw new Error('--user-id requires a non-empty value')
+    event.chatterId = userId
+    event.messageId = `simulated-chat-entry-${userId}`
+  }
+}
+
+function normalizeChatEntryRole(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'mod') return 'moderator'
+  if (normalized === 'moderator' || normalized === 'vip') return normalized
+  throw new Error('--role must be moderator or vip')
 }
 
 /**
@@ -202,6 +247,7 @@ function normalizeEventType(value) {
 }
 
 function sourceForEvent(eventType) {
+  if (eventType === 'chat.entry') return 'chat-entry'
   return eventType === 'subscription' || eventType === 'subscription-gift' ? 'subscription' : eventType
 }
 
@@ -268,7 +314,7 @@ function createSimulatedObs() {
 }
 
 function printUsage() {
-  console.log('Usage: npm run simulate:twitch-event -- <follow|raid|sub|gift-sub> [fixture.json] [--count 5] [--tier 1000] [--live] [--url http://127.0.0.1:5000]')
+  console.log('Usage: npm run simulate:twitch-event -- <chat-entry|follow|raid|sub|gift-sub> [fixture.json] [--count 5] [--tier 1000] [--role moderator|vip] [--user-id VALUE] [--live] [--url http://127.0.0.1:5000]')
 }
 
 function relativePath(file) {
@@ -331,8 +377,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  applyFixtureOverrides,
   formatHttpError,
+  normalizeEventType,
+  parseArgs,
   parseResponseText,
   simulateLiveEvent,
+  sourceForEvent,
   summarizeResponseText
 }

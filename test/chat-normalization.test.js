@@ -58,4 +58,5 @@ test('commands and handlers normalize aliases, roles, and match criteria', () =>
   assert.deepEqual(handler.roles, ['moderator'])
   assert.equal(handler.inputPatterns[0].source, 'hydrate')
   assert.equal(normalizeEventName('chat_entry'), 'chat.entry')
+  assert.equal(normalizeEventName('chat-entry'), 'chat.entry')
 })

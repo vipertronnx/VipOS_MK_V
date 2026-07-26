@@ -608,11 +608,11 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
   }
 
   /**
-   * Dispatches a supported community EventSub payload through its normal automation handler without Twitch connectivity.
+   * Dispatches a supported Twitch chat-message or community EventSub payload through its normal automation handler without Twitch connectivity.
    * When an action queue is configured, the promise resolves after matching actions are enqueued, not after queue completion.
    *
-   * @param {string} type Supported event name or alias for follow, raid, or subscription events.
-   * @param {Record<string, unknown>} event Event payload shaped like the corresponding Twurple event.
+   * @param {string} type Supported event name or alias for chat entry, follow, raid, or subscription events.
+   * @param {Record<string, unknown>} event Event payload shaped like the corresponding Twurple chat-message or EventSub event.
    * @returns {Promise<void>} Resolves after matching handlers have been dispatched.
    * @throws {Error} Rejects for unsupported event types or failures from matching automation handlers.
    */
@@ -623,6 +623,8 @@ function createChatService({ actions, actionQueue = null, commandConfigFileSyste
     const normalizedType = normalizeEventName(type)
     try {
       switch (normalizedType) {
+        case 'chat.entry':
+          return await handleMessage(event)
         case 'follow.add':
           return await handleFollow(event)
         case 'raid.add':
