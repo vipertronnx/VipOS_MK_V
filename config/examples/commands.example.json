@@ -70,7 +70,8 @@
       },
       "actions": [
         { "type": "context.pickRandom", "contextKey": "greeting" },
-        { "type": "overlay.alert", "message": "{greeting}, {displayName}!" },
+        { "type": "context.pickRandom", "contextKey": "emote", "file": "emotes.json" },
+        { "type": "overlay.alert", "message": "{greeting}, {displayName}! {emote}" },
         { "type": "sound.play", "src": "example.mp3", "volume": 1 }
       ]
     }
