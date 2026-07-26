@@ -17,7 +17,7 @@ const { normalizeCompletionDelay } = require('./modules/utils/completion-delay')
 const { createGreetingService } = require('./modules/actions/greetings')
 const { createMacroService } = require('./modules/actions/macros')
 const { createObsService } = require('./modules/obs')
-const { createLowerThirdSync, parseAlwaysVisibleObsScenes } = require('./modules/overlays/lower-third')
+const { createLowerThirdSync, parseAlwaysVisibleObsScenes } = require('./modules/overlays/chyron')
 const { createRaffleService } = require('./modules/chat/chat-raffles')
 const { parseBool } = require('./modules/utils/value-normalization')
 
@@ -30,7 +30,8 @@ const SOUND_COMPLETION_BUFFER_MS = numberOrDefault(process.env.QUEUE_SOUND_COMPL
 const NEWS_CHYRON_ROTATE_INTERVAL_MS = numberOrDefault(process.env.NEWS_CHYRON_ROTATE_INTERVAL_MS, 30000)
 const NEWS_CHYRON_ITEMS_DEFAULT = process.env.NEWS_CHYRON_ITEMS_DEFAULT || 'config/examples/news-chyron.example.json'
 const NEWS_CHYRON_ITEMS = readNewsChyronItems()
-const LOWER_THIRD_TOGGLE_INTERVAL_MS = numberOrDefault(process.env.LOWER_THIRD_TOGGLE_INTERVAL_MS, 3 * 60 * 1000)
+const LOWER_THIRD_VISIBLE_DURATION_MS = numberOrDefault(process.env.LOWER_THIRD_VISIBLE_DURATION_MS, 3 * 60 * 1000)
+const LOWER_THIRD_HIDDEN_DURATION_MS = numberOrDefault(process.env.LOWER_THIRD_HIDDEN_DURATION_MS, 3 * 60 * 1000)
 const LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES = parseAlwaysVisibleObsScenes(process.env.LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES)
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE, '140px')
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION = cssTimeOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION, '600ms')
@@ -121,8 +122,9 @@ function createRuntimeServices({ io }) {
   const quietMode = createQuietMode()
   const lowerThirdSync = createLowerThirdSync({
     alwaysVisibleObsScenes: LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES,
+    hiddenDurationMs: LOWER_THIRD_HIDDEN_DURATION_MS,
     io,
-    toggleIntervalMs: LOWER_THIRD_TOGGLE_INTERVAL_MS
+    visibleDurationMs: LOWER_THIRD_VISIBLE_DURATION_MS
   })
   const obs = createObsService()
   const unsubscribeLowerThirdSceneSync = obs.onCurrentSceneChanged(sceneName => {
