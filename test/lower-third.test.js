@@ -159,8 +159,10 @@ test('configured scenes force both shared lower thirds visible and pause the tim
   lowerThird.setCurrentObsScene('Gameplay')
   assert.deepEqual(lowerThird.getStatus(), {
     alwaysVisibleObsScenes: ['Gameplay', 'Just Chatting'],
+    alwaysHiddenObsScenes: [],
     currentObsScene: 'Gameplay',
     forcedVisible: true,
+    forcedHidden: false,
     hidden: false,
     timerRunning: false,
     hiddenDurationMs: 250,
@@ -177,6 +179,52 @@ test('configured scenes force both shared lower thirds visible and pause the tim
   lowerThird.setCurrentObsScene('Just Chatting')
   assert.equal(timers.scheduled.length, 2)
   assert.equal(lowerThird.getStatus().currentObsScene, 'Just Chatting')
+})
+
+test('configured scenes force both shared lower thirds hidden and reject show requests', () => {
+  const io = createIo()
+  const timers = createTimers()
+  const lowerThird = createLowerThirdSync({
+    alwaysHiddenObsScenes: ['Starting Soon'],
+    clearTimer: timers.clearTimer,
+    io,
+    setTimer: timers.setTimer,
+    hiddenDurationMs: 250,
+    visibleDurationMs: 1000
+  })
+
+  lowerThird.setCurrentObsScene('Starting Soon')
+  assert.equal(lowerThird.getStatus().forcedHidden, true)
+  assert.equal(lowerThird.getStatus().hidden, true)
+  assert.equal(lowerThird.getStatus().timerRunning, false)
+
+  const eventCount = io.emitted.length
+  lowerThird.show()
+  lowerThird.toggle()
+  assert.equal(io.emitted.length, eventCount)
+  assert.equal(lowerThird.getStatus().hidden, true)
+
+  lowerThird.setCurrentObsScene('Gameplay')
+  assert.equal(lowerThird.getStatus().forcedHidden, false)
+  assert.equal(lowerThird.getStatus().hidden, true)
+  assert.equal(timers.scheduled.at(-1).delay, 250)
+})
+
+test('always-hidden scenes take precedence over always-visible scenes', () => {
+  const lowerThird = createLowerThirdSync({
+    alwaysHiddenObsScenes: ['BRB'],
+    alwaysVisibleObsScenes: ['BRB'],
+    io: createIo(),
+    hiddenDurationMs: 250,
+    visibleDurationMs: 1000
+  })
+
+  lowerThird.setCurrentObsScene('BRB')
+
+  assert.equal(lowerThird.getStatus().forcedHidden, true)
+  assert.equal(lowerThird.getStatus().forcedVisible, false)
+  assert.equal(lowerThird.getStatus().hidden, true)
+  lowerThird.stop()
 })
 
 test('leaving configured scenes restarts the shared timer from a visible state', () => {

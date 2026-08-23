@@ -91,6 +91,8 @@ The news chyron and Venom Coin overlays share synchronized hide/show state. They
 
 Set `LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` to a JSON array of exact OBS program-scene names to force both overlays visible while one of those scenes is active. The shared timer pauses in those scenes and restarts from its full visible duration when OBS leaves them. Only OBS program-scene changes apply; Studio Mode preview changes do not.
 
+Set `LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES` the same way to force both overlays hidden. Show and toggle requests cannot reveal them while such a scene is active. The timer pauses and restarts from its full hidden duration on exit. Always hidden takes precedence when a scene appears in both lists.
+
 Use the control panel or:
 
 - `POST /api/v1/lower-third/hide`

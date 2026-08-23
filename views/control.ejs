@@ -86,6 +86,14 @@
         </div>
       </form>
 
+      <form data-json-form data-endpoint="/api/v1/terminator">
+        <label for="terminator-message">Terminator overlay</label>
+        <div class="control-row">
+          <input id="terminator-message" name="message" type="text" placeholder="Optional message for the Terminator overlay" autocomplete="off" />
+          <button type="submit">Trigger</button>
+        </div>
+      </form>
+
       <div class="button-row">
         <button type="button" data-post="/api/v1/bg-alert">Border Alert</button>
         <button type="button" data-post="/api/v1/bg-random">Random Border</button>

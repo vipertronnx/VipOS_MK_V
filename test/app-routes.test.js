@@ -504,6 +504,28 @@ test('/api/v1/text and /api/v1/alert enqueue equivalent alerts with distinct lab
   ])
 })
 
+test('/api/v1/terminator enqueues a terminator overlay action', async () => {
+  const { enqueued, services } = createFakeServices()
+  const app = createApp(services)
+
+  await withTestServer(app, async baseUrl => {
+    const { payload, response } = await postJson(baseUrl, '/api/v1/terminator', { message: 'Vision online' })
+
+    assert.equal(response.status, 200)
+    assert.equal(payload.ok, true)
+    assert.equal(payload.queued, true)
+  })
+
+  assert.deepEqual(enqueued, [{
+    actions: [{ type: 'overlay.terminator', message: 'Vision online' }],
+    completionDelayMs: undefined,
+    context: { source: 'api' },
+    fallbackCompletionDelayMs: 4000,
+    name: 'Terminator Alert',
+    source: 'api'
+  }])
+})
+
 test('/api/v1/bg-alert enqueues the semantic border alert action', async () => {
   const { enqueued, services } = createFakeServices()
   const app = createApp(services)

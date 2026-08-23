@@ -28,13 +28,14 @@ function parseAlwaysVisibleObsScenes(value, {
 
 /**
  * Creates the shared hide/show state used by the News Chyron and Venom Coin overlays.
- * Configured OBS program scenes force both overlays visible and suspend their shared timer.
+ * Configured OBS program scenes can force both overlays visible or hidden and suspend their shared timer.
  *
  * @param {object} options Service dependencies and configuration.
  * @param {object} options.io Socket.IO server used to emit overlay events.
  * @param {number} options.visibleDurationMs Time the shared lower third remains visible before automatically hiding.
  * @param {number} options.hiddenDurationMs Time the shared lower third remains hidden before automatically showing.
  * @param {string[]} [options.alwaysVisibleObsScenes=[]] OBS scenes that force the shared lower third visible.
+ * @param {string[]} [options.alwaysHiddenObsScenes=[]] OBS scenes that force the shared lower third hidden.
  * @param {Function} [options.setTimer=setTimeout] Timeout scheduler, injected for tests.
  * @param {Function} [options.clearTimer=clearTimeout] Timeout cleanup function, injected for tests.
  * @returns {object} Shared lower-third state and controls.
@@ -44,13 +45,17 @@ function createLowerThirdSync({
   visibleDurationMs,
   hiddenDurationMs,
   alwaysVisibleObsScenes = [],
+  alwaysHiddenObsScenes = [],
   setTimer = setTimeout,
   clearTimer = clearTimeout
 }) {
   const configuredScenes = normalizeSceneNames(alwaysVisibleObsScenes)
+  const configuredHiddenScenes = normalizeSceneNames(alwaysHiddenObsScenes)
   const alwaysVisibleSceneSet = new Set(configuredScenes)
+  const alwaysHiddenSceneSet = new Set(configuredHiddenScenes)
   let currentObsScene = null
   let forcedVisible = false
+  let forcedHidden = false
   let hidden = false
   let timer = null
 
@@ -64,7 +69,7 @@ function createLowerThirdSync({
   }
 
   function startTimer() {
-    if (timer !== null || forcedVisible) return
+    if (timer !== null || forcedVisible || forcedHidden) return
 
     const durationMs = hidden ? hiddenDurationMs : visibleDurationMs
     if (durationMs <= 0) return
@@ -81,7 +86,7 @@ function createLowerThirdSync({
   }
 
   function setHidden(nextHidden, event) {
-    if (forcedVisible && nextHidden) return getStatus()
+    if ((forcedVisible && nextHidden) || (forcedHidden && !nextHidden)) return getStatus()
 
     hidden = Boolean(nextHidden)
     emitState(event)
@@ -90,7 +95,7 @@ function createLowerThirdSync({
   }
 
   function toggle() {
-    if (forcedVisible) return getStatus()
+    if (forcedVisible || forcedHidden) return getStatus()
 
     return setHidden(!hidden, 'lower-third-toggle')
   }
@@ -101,20 +106,27 @@ function createLowerThirdSync({
 
   /**
    * Applies the program-scene policy to the shared lower-third state.
-   * Entering a configured scene makes both overlays visible and pauses the timer.
-   * Leaving one makes both visible and restarts the full visible duration.
+   * Entering a configured scene applies its forced state and pauses the timer.
+   * Leaving one retains that state and restarts its full duration.
    *
    * @param {string|null|undefined} sceneName Active OBS program-scene name.
    * @returns {object} Current lower-third status.
    */
   function setCurrentObsScene(sceneName) {
+    const wasForcedHidden = forcedHidden
     currentObsScene = normalizeSceneName(sceneName)
-    const nextForcedVisible = Boolean(currentObsScene && alwaysVisibleSceneSet.has(currentObsScene))
+    const nextForcedHidden = Boolean(currentObsScene && alwaysHiddenSceneSet.has(currentObsScene))
+    const nextForcedVisible = Boolean(!nextForcedHidden && currentObsScene && alwaysVisibleSceneSet.has(currentObsScene))
 
-    if (nextForcedVisible === forcedVisible) return getStatus()
+    if (nextForcedVisible === forcedVisible && nextForcedHidden === forcedHidden) return getStatus()
 
     forcedVisible = nextForcedVisible
-    return show()
+    forcedHidden = nextForcedHidden
+    if (forcedHidden) return setHidden(true, 'lower-third-hide')
+    if (forcedVisible) return show()
+    return wasForcedHidden
+      ? setHidden(true, 'lower-third-hide')
+      : show()
   }
 
   function emitOverlayEvent(event, payload = {}) {
@@ -131,8 +143,10 @@ function createLowerThirdSync({
   function getStatus() {
     return {
       alwaysVisibleObsScenes: configuredScenes,
+      alwaysHiddenObsScenes: configuredHiddenScenes,
       currentObsScene,
       forcedVisible,
+      forcedHidden,
       hidden,
       timerRunning: timer !== null,
       hiddenDurationMs,

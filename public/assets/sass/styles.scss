@@ -509,12 +509,58 @@ a:hover {color: var(--featured-color-hover);}
   }
 }
 
-/* V I P E R - C A M
+/* T E R M I N A T O R - V I S I O N
 -------------------------------------------------------------------------------*/
-#viper-cam {
-  background: url('../img/viper_cam_bg.jpg') no-repeat center;
-  height: 1080px;
+
+#terminator-alert {
+
   width: 1920px;
+  height: 1080px;
+
+  #red-background {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 1080px;
+    width: 1920px;
+    background: red;
+    z-index: -1000;
+    opacity: 0.75;
+  }
+
+  table {
+    color: #fff;
+    font-weight: 900;
+    font-size: 20px;
+    font-family: 'Consolas', Verdana, sans-serif;
+    filter: blur(0.5px);
+
+    tr {
+      display: none;
+      td {
+        padding: 0 15px 2px 0;
+        &.slot {
+          padding-right: 25px;
+        }
+        &.super-padding {
+          padding-right: 75px;
+        }
+      }
+    }
+  }
+
+  #left-table {
+    position: absolute;
+    top: 20px;
+    left: 100px;
+  }
+
+  #center-table {
+    position: absolute;
+    left: 650px;
+    top: 750px;
+  }
 }
 
 /* M E D I A - Q U E R I E S

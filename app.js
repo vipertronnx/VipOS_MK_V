@@ -33,6 +33,9 @@ const NEWS_CHYRON_ITEMS = readNewsChyronItems()
 const LOWER_THIRD_VISIBLE_DURATION_MS = numberOrDefault(process.env.LOWER_THIRD_VISIBLE_DURATION_MS, 3 * 60 * 1000)
 const LOWER_THIRD_HIDDEN_DURATION_MS = numberOrDefault(process.env.LOWER_THIRD_HIDDEN_DURATION_MS, 3 * 60 * 1000)
 const LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES = parseAlwaysVisibleObsScenes(process.env.LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES)
+const LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES = parseAlwaysVisibleObsScenes(process.env.LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES, {
+  variableName: 'LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES'
+})
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DISTANCE, '140px')
 const NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION = cssTimeOrDefault(process.env.NEWS_CHYRON_LOWER_THIRD_SLIDE_DURATION, '600ms')
 const VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE = cssLengthOrDefault(process.env.VENOM_COIN_LOWER_THIRD_SLIDE_DISTANCE, '100%')
@@ -121,6 +124,7 @@ function getSocketPage(referer) {
 function createRuntimeServices({ io }) {
   const quietMode = createQuietMode()
   const lowerThirdSync = createLowerThirdSync({
+    alwaysHiddenObsScenes: LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES,
     alwaysVisibleObsScenes: LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES,
     hiddenDurationMs: LOWER_THIRD_HIDDEN_DURATION_MS,
     io,
@@ -868,6 +872,17 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
 
   app.post('/api/v1/alert', asyncHandler(async (req, res) => {
     enqueueTextAlert(res, req, 'Overlay Alert')
+  }))
+
+  app.post('/api/v1/terminator', asyncHandler(async (req, res) => {
+    const message = req.body.message || req.body.msg || req.body.text || ''
+    const payload = req.body.payload && typeof req.body.payload === 'object' ? req.body.payload : undefined
+    const actions = [{ type: 'overlay.terminator', ...(payload ? { payload } : {}), ...(message ? { message } : {}) }]
+
+    enqueueApiActions(res, 'Terminator Alert', actions, {
+      completionDelayMs: getRequestCompletionDelay(req),
+      fallbackCompletionDelayMs: DEFAULT_SOUND_COMPLETION_DELAY_MS
+    })
   }))
 
   app.post('/api/v1/sound', asyncHandler(async (req, res) => {

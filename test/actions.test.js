@@ -88,6 +88,7 @@ test('action structure validation accepts every supported action type', () => {
     { type: 'border.alert' },
     { type: 'chyron.alert', h1: 'Headline', h2: 'Subhead', h3: 'Title' },
     { type: 'overlay.alert', message: '{displayName} joined' },
+    { type: 'overlay.terminator', message: 'Terminator engaged' },
     { type: 'overlay.emit', event: 'bg-alert' },
     { type: 'sound.pickRandom' },
     { type: 'sound.play', src: 'example.mp3' }
@@ -200,6 +201,7 @@ test('action definitions execute every supported action type', async () => {
       { type: 'obs.source', scene: 'Live', source: 'Camera', visible: true },
       { type: 'overlay.alert', message: '{greeting} alert', sound: false },
       { type: 'border.alert', sound: false },
+      { type: 'overlay.terminator', message: '{greeting} terminator', payload: { message: '{greeting} terminator' } },
       { type: 'overlay.emit', event: 'custom-alert', payload: { greeting: '{greeting}' } },
       { type: 'sound.pickRandom', contextKey: 'sfx', textMap: { 'alert.wav': 'Alert sound' } },
       { type: 'sound.play', src: '{sfx.src}' }
@@ -216,6 +218,7 @@ test('action definitions execute every supported action type', async () => {
       'obs.source',
       'overlay.alert',
       'border.alert',
+      'overlay.terminator',
       'overlay.emit',
       'sound.pickRandom',
       'sound.play'
@@ -234,6 +237,7 @@ test('action definitions execute every supported action type', async () => {
       { event: 'bg-alert', payload: undefined },
       { event: 'text-alert', payload: { message: 'Hello alert' } },
       { event: 'bg-alert', payload: undefined },
+      { event: 'terminator', payload: { message: 'Hello terminator' } },
       { event: 'custom-alert', payload: { greeting: 'Hello' } },
       { event: 'sound-play', payload: { src: 'alert.wav', volume: 1 } }
     ])

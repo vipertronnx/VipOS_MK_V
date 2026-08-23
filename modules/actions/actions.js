@@ -32,6 +32,7 @@ const ACTION_DEFINITIONS = {
   'border.alert': { execute: executeBorderAlert, quietable: true, requiredFields: [] },
   'chyron.alert': { execute: executeChyronAlert, quietable: true, requiredFields: [['h1'], ['h2'], ['h3']] },
   'overlay.alert': { execute: executeOverlayAlert, quietable: true, requiredFields: [['message']] },
+  'overlay.terminator': { execute: executeOverlayTerminator, quietable: true, requiredFields: [] },
   'overlay.emit': { execute: executeOverlayEmit, quietable: true, requiredFields: [['event']] },
   'sound.pickRandom': { execute: executeSoundPickRandom, quietable: true, requiredFields: [], sound: true },
   'sound.play': { execute: executeSoundPlay, quietable: true, requiredFields: [['src', 'path']], sound: true }
@@ -313,6 +314,19 @@ function executeChyronAlert(action, context, options, runtime) {
   runtime.overlayEmit('lower-third-show')
   runtime.io.emit('chyron-alert', { h1, h2, h3 })
   return { type: 'chyron.alert', h1, h2, h3 }
+}
+
+function executeOverlayTerminator(action, context, options, runtime) {
+  const message = hydrate(action.message, context)
+  const payload = hydrate(action.payload || {}, context)
+  const eventPayload = payload && typeof payload === 'object' && !Array.isArray(payload) ? { ...payload } : {}
+
+  if (message !== undefined && message !== null && message !== '') {
+    eventPayload.message = message
+  }
+
+  runtime.overlayEmit('terminator', eventPayload)
+  return { type: 'overlay.terminator', message, payload: eventPayload }
 }
 
 function executeOverlayEmit(action, context, options, runtime) {

@@ -17,7 +17,68 @@
 
 <div id="sound-stage" aria-hidden="true"></div>
 
+<div id="terminator-alert">
+  <div id="red-background"></div>
+  <table id="left-table">
+    <tbody>
+      <tr><td>136</td><td>6085</td><td>A0</td><td>0A</td><td></td></tr>
+      <tr><td>137</td><td>6087</td><td>B9</td><td>E1</td><td>6O</td></tr>
+      <tr><td>138</td><td>608A</td><td>99</td><td>F0</td><td>03</td></tr>
+      <tr><td>139</td><td>608D</td><td>8L</td><td></td><td></td></tr>
+      <tr><td>140</td><td>608E</td><td>10</td><td>F7</td><td></td></tr>
+      <tr><td>141</td><td>6090</td><td>AD</td><td>F3</td><td>03</td></tr>
+      <tr><td>142</td><td>6093</td><td>49</td><td>A5</td><td></td></tr>
+      <tr><td>143</td><td>6095</td><td>8D</td><td>F4</td><td>03</td></tr>
+      <tr><td>144</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>145</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>146</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>147</td><td>6098</td><td>A9</td><td>03</td><td></td></tr>
+      <tr><td>148</td><td>609A</td><td>A0</td><td>F0</td><td></td></tr>
+      <tr><td>149</td><td>609C</td><td>85</td><td>3D</td><td></td></tr>
+      <tr><td>150</td><td>609E</td><td>85</td><td>43</td><td></td></tr>
+      <tr><td>151</td><td>60A0</td><td>84</td><td>3C</td><td></td></tr>
+      <tr><td>152</td><td>60A2</td><td>84</td><td>42</td><td></td></tr>
+      <tr><td>153</td><td>60A4</td><td>A9</td><td>03</td><td></td></tr>
+      <tr><td>154</td><td>60A6</td><td>A0</td><td>FA</td><td></td></tr>
+      <tr><td>155</td><td>60A8</td><td>85</td><td>3F</td><td></td></tr>
+      <tr><td>156</td><td>60AA</td><td>84</td><td>3E</td><td></td></tr>
+      <tr><td>157</td><td>60AC</td><td>38</td><td></td><td></td></tr>
+      <tr><td>158</td><td>60AD</td><td>20</td><td>11</td><td>C3</td></tr>
+      <tr><td>159</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>160</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>161</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>162</td><td>60B0</td><td>A9</td><td>60</td><td></td></tr>
+      <tr><td>163</td><td>60B2</td><td>A0</td><td>EF</td><td></td></tr>
+      <tr><td>164</td><td>60B4</td><td>85</td><td>3D</td><td></td></tr>
+      <tr><td>165</td><td>60B6</td><td>85</td><td>43</td><td></td></tr>
+      <tr><td>166</td><td>60B8</td><td>84</td><td>3C</td><td></td></tr>
+      <tr><td>167</td><td>60BA</td><td>84</td><td>42</td><td></td></tr>
+      <tr><td>168</td><td>60BC</td><td>A9</td><td>64</td><td></td></tr>
+      <tr><td>169</td><td>60BE</td><td>A0</td><td>5D</td><td></td></tr>
+      <tr><td>170</td><td>60C0</td><td>85</td><td>3F</td><td></td></tr>
+      <tr><td>171</td><td>60C2</td><td>84</td><td>3E</td><td></td></tr>
+      <tr><td>172</td><td>60C4</td><td>38</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <table id="center-table">
+    <tbody>
+      <tr><td>29</td><td class="slot">SLOTA</td><td>EQU</td><td class="super-padding">$06</td><td>:ADDRESS ADDER (SLOT# . 16)</td></tr>
+      <tr><td>30</td><td class="slot">SLOT </td><td>EQU</td><td class="super-padding">$07</td><td>:<<< POKE RAMCARD SLOT# (0 TO 7)</td></tr>
+      <tr><td>31</td><td class="slot">BANK </td><td>EQU</td><td class="super-padding">$08</td><td>:<<< POKE 16K RAM BANK (1 TO 8)</td></tr>
+      <tr><td>32</td><td class="slot">COUNT</td><td>EQU</td><td class="super-padding">$F9</td><td>:HIBYTE # OF POINTS PLOTTED</td></tr>
+      <tr><td>33</td><td class="slot">VIEW </td><td>EQU</td><td class="super-padding">$FA</td><td>:PAGE VIEWED (INDIRECT)</td></tr>
+      <tr><td>34</td><td class="slot">VIEWH</td><td>EQU</td><td class="super-padding">$FB</td><td>:HIBYTE OF VIEW</td></tr>
+      <tr><td>35</td><td class="slot">STOR </td><td>EQU</td><td class="super-padding">$FC</td><td>:PAGE IN STORAGE (INDIRECT)</td></tr>
+      <tr><td>36</td><td class="slot">STORH</td><td>EQU</td><td class="super-padding">$FD</td><td>:HIBYTE OF STOR</td></tr>
+      <tr><td>37</td><td class="slot">D0   </td><td>EQU</td><td class="super-padding">$FE</td><td>:USED FOR BANK SWITCHING RESET</td></tr>
+      <tr><td>38</td><td class="slot">D0H  </td><td>EQU</td><td class="super-padding">$FF</td><td>:HIBYTE OF D0=0</td></tr>
+    </tbody>
+  </table>
+</div>
+
 <script type="text/javascript" src="/assets/js/alerts.js"></script>
+<script type="text/javascript" src="/assets/js/terminator.js"></script>
 <script type="text/javascript" src="/assets/js/sounds.js"></script>
 
 <%- include("../templates/footer") %>

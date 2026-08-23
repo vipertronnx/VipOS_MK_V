@@ -90,10 +90,11 @@ Sound paths are relative to `public/assets/sounds/` and may point into subdirect
 | `LOWER_THIRD_VISIBLE_DURATION_MS` | `180000` | Time the shared news chyron and Venom Coin remain visible before automatically hiding. Set to `0` to keep them visible. |
 | `LOWER_THIRD_HIDDEN_DURATION_MS` | `180000` | Time the shared news chyron and Venom Coin remain hidden before automatically showing. Set to `0` to keep them hidden. |
 | `LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` | Empty | JSON array of exact OBS program-scene names that force both the news chyron and Venom Coin visible. |
+| `LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES` | Empty | JSON array of exact OBS program-scene names that force both the news chyron and Venom Coin hidden. |
 
 Slide distances accept numeric `px`, `%`, `vh`, `vw`, `rem`, or `em` values. Slide durations accept numeric `ms` or `s` values. Invalid values use their defaults.
 
-Set both lower-third duration variables to `0` to disable automatic changes completely. `LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` must be a JSON array such as `["Gameplay","Just Chatting"]`. While OBS is on one of those program scenes, the shared lower-third timer is paused and both overlays remain visible. Leaving the configured scenes restarts the full visible duration. Scene names match exactly, and changes require an application restart.
+Set both lower-third duration variables to `0` to disable automatic changes completely. `LOWER_THIRD_ALWAYS_VISIBLE_OBS_SCENES` and `LOWER_THIRD_ALWAYS_HIDDEN_OBS_SCENES` must be JSON arrays such as `["Gameplay","Just Chatting"]`. While OBS is on a configured scene, the shared lower-third timer is paused and both overlays remain in the forced state. Leaving the scene restarts the full duration for that state. If a scene is in both lists, always hidden takes precedence. Scene names match exactly, and changes require an application restart.
 
 ### Raffle overrides
 
