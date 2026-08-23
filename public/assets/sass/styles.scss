@@ -95,17 +95,33 @@ a:hover {color: var(--featured-color-hover);}
 /* A N I M A T E D - B A C K G R O U N D
 -------------------------------------------------------------------------------*/
 #animated-bg {
-  background: linear-gradient(-90deg, #ff0000, #ffdb78, #ff0000);
-	background-size: 300% 300%;
-	animation: gradient 10s ease infinite;
+  --border-gradient: linear-gradient(-90deg, #ff0000, #ffdb78, #ff0000);
+  --border-gradient-duration: 5s;
+  contain: paint;
   height: 1080px;
+  overflow: hidden;
   padding: 7px;
+  position: relative;
   width: 1920px;
+
+  &::before {
+    animation: gradient-slide var(--border-gradient-duration) ease-in-out infinite alternate;
+    background: var(--border-gradient);
+    content: '';
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    transform: translate3d(0, 0, 0);
+    width: 300%;
+    will-change: transform;
+  }
 
   #bg-chroma-key {
     background-color: #00e439;
     border: 4px solid #000;
     height: 100%;
+    position: relative;
     width: 100%;
   }
 
@@ -115,59 +131,40 @@ a:hover {color: var(--featured-color-hover);}
    * No green - the premise is to use this as a background for chroma keying, so green is reserved for that purpose.
    */
   &.random1 {
-    background: linear-gradient(-90deg, #ff0000, #ffdb78, #ff0000);
-    background-size: 300% 300%;
-    animation: gradient 10s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #ff0000, #ffdb78, #ff0000);
   }
 
   &.random2 {
-    background: linear-gradient(-90deg, #0084ff, #ff00f0, #0084ff);
-    background-size: 300% 300%;
-    animation: gradient 10s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #0084ff, #ff00f0, #0084ff);
   }
 
   &.random3 {
-    background: linear-gradient(-90deg, #2b336f, #7a3291, #2b336f);
-    background-size: 300% 300%;
-    animation: gradient 10s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #2b336f, #7a3291, #2b336f);
   }
 
   &.random4 {
-    background: linear-gradient(-90deg, #e75333, #0084ff, #e75333);
-    background-size: 300% 300%;
-    animation: gradient 10s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #e75333, #0084ff, #e75333);
   }
 
   &.random5 {
-    background: linear-gradient(-90deg, #ff00f0, #2b336f, #ff00f0);
-    background-size: 300% 300%;
-    animation: gradient 10s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #ff00f0, #2b336f, #ff00f0);
   }
 
   &.random6 {
-    background: linear-gradient(-90deg, #fd5102, #00e1ff, #fd5102);
-    background-size: 300% 300%;
-    animation: gradient 10s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #fd5102, #00e1ff, #fd5102);
   }
 
   &.alert {
-    background: linear-gradient(-90deg, #ff0000, #ffffff, #ff0000, #ffffff, #ff0000);
-    background-size: 200% 200%;
-	  animation: gradient 1.5s ease infinite;
+    --border-gradient: linear-gradient(-90deg, #ff0000, #ffffff, #ff0000, #ffffff, #ff0000);
+    --border-gradient-duration: 0.75s;
   }
 
 }
 
-@keyframes gradient {
-	0% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 200% 50%;
-	}
-	100% {
-		background-position: 0% 50%;
-	}
+@keyframes gradient-slide {
+  to {
+    transform: translate3d(-66.6667%, 0, 0);
+  }
 }
 
 /* T V - G U I D E
@@ -228,6 +225,7 @@ a:hover {color: var(--featured-color-hover);}
     tbody {
       animation: tvguide 180s linear infinite;
       position: relative;
+      will-change: transform;
 
       tr { width: 100%; }
 
@@ -258,10 +256,10 @@ a:hover {color: var(--featured-color-hover);}
 
 @keyframes tvguide {
 	0% {
-    top: 0;
+    transform: translate3d(0, 0, 0);
 	}
   100% {
-    top: var(--tv-guide-scroll-distance, -3188px);
+    transform: translate3d(0, var(--tv-guide-scroll-distance, -3188px), 0);
   }
 }
 
