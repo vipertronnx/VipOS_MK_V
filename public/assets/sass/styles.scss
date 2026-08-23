@@ -274,27 +274,30 @@ a:hover {color: var(--featured-color-hover);}
   width: 1920px;
 
   div.background {
-    position: absolute;;
+    position: absolute;
     height:1080px;
-    transition: all 0.2s;
+    transition: transform 0.2s;
     width: 960px;
+    will-change: transform;
     z-index: -10;
 
     &.left {
       background: url('../img/text_alert_bg_left_v4.jpg');
-      left: -960px;
+      left: 0;
       top: 0;
+      transform: translate3d(-100%, 0, 0);
       &.slide {
-        left: 0px;
+        transform: translate3d(0, 0, 0);
       }
     }
 
     &.right {
       background: url('../img/text_alert_bg_right_v4.jpg');
-      left: 1920px;
+      right: 0;
       top: 0;
+      transform: translate3d(100%, 0, 0);
       &.slide {
-        left: 960px;
+        transform: translate3d(0, 0, 0);
       }
     }
   }
