@@ -1,59 +1,72 @@
-var currentInterval = 0;
+const currentTime = document.getElementById('current-time');
+const currentTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric',
+  hour12: true
+});
+const slotTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: 'numeric',
+  hour12: true
+});
+const slotHeaders = Array.from({ length: 4 }, (_, index) => (
+  document.getElementById(`slot-${index + 1}`)
+));
+const elem = document.querySelector('#tv-guide-body');
+let currentSlotBucket = '';
 
-// Get the element
-var elem = document.querySelector('#tv-guide-body');
-
-// Create a copy of it
-var clone = elem.cloneNode(true);
-
-// Remove the ID and add a class
+// Duplicate the guide rows to make the scrolling loop continuous.
+const clone = elem.cloneNode(true);
 clone.removeAttribute('id');
 clone.classList.add('scroll-copy');
-
-// Inject it into the DOM
 elem.after(clone);
 
+function setText(element, value) {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
 function syncScrollDistance() {
-  var scrollDistance = elem.getBoundingClientRect().height;
-  document.documentElement.style.setProperty('--tv-guide-scroll-distance', '-' + scrollDistance + 'px');
+  const scrollDistance = elem.getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--tv-guide-scroll-distance', `-${scrollDistance}px`);
 }
 
-function renderCurrentTime(){
-  var date = new Date();
-  var day = date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true })
-  var currentTime = document.getElementById('current-time');
-  currentTime.innerHTML = day.replace("AM","").replace("PM","");
-  if((date.getMinutes() == 0 || date.getMinutes() == 30) && date.getSeconds() == 0 ) { renderFutureTimeSlots(); }
-  setTimeout(renderCurrentTime,1000);
+function getSlotBucket(date) {
+  return [
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    date.getHours(),
+    Math.floor(date.getMinutes() / 30)
+  ].join('-');
 }
 
-function renderFutureTimeSlots() {
-  var intervals = [0,30,60,90];
+function renderCurrentTime() {
+  const now = new Date();
+  const formattedTime = currentTimeFormatter.format(now).replace(/\s?(AM|PM)$/, '');
+  setText(currentTime, formattedTime);
 
-  for(i=0;i<4;i++) {
-    var now = new Date();
-    if(now.getMinutes() == 0 || now.getMinutes() == 30) {
-      now.setMinutes(now.getMinutes()+1);
-    }
-
-    var slotID = i+1;
-    var slotHeader = document.getElementById('slot-'+slotID);
-
-    now.setMinutes(now.getMinutes() + intervals[i]);
-    var nextInterval = Math.ceil(now.getMinutes() / 30) * 30;
-
-    if(nextInterval == 30) {
-      now.setMinutes(30);
-    } else if (nextInterval == 60) {
-      now.setMinutes(0);
-      now.setHours(now.getHours()+1);
-    }
-
-    slotHeader.innerHTML = now.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+  const slotBucket = getSlotBucket(now);
+  if (slotBucket !== currentSlotBucket) {
+    currentSlotBucket = slotBucket;
+    renderFutureTimeSlots(now);
   }
+
+  setTimeout(renderCurrentTime, 1000);
+}
+
+function renderFutureTimeSlots(date = new Date()) {
+  const nextSlot = new Date(date);
+  nextSlot.setSeconds(0, 0);
+  nextSlot.setMinutes(Math.ceil((nextSlot.getMinutes() + 1) / 30) * 30);
+
+  slotHeaders.forEach((slotHeader, index) => {
+    const slotTime = new Date(nextSlot);
+    slotTime.setMinutes(nextSlot.getMinutes() + (index * 30));
+    setText(slotHeader, slotTimeFormatter.format(slotTime));
+  });
 }
 
 syncScrollDistance();
 window.addEventListener('resize', syncScrollDistance);
 renderCurrentTime();
-renderFutureTimeSlots();
