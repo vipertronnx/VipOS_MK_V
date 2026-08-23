@@ -469,7 +469,8 @@ a:hover {color: var(--featured-color-hover);}
     height: 100px;
     padding: 0 20px 0 10px;
     position: relative;
-    top: -100px;
+    transform: translate3d(0, -100px, 0);
+    will-change: transform;
 
     h1 {
       color: #fff;
@@ -486,27 +487,22 @@ a:hover {color: var(--featured-color-hover);}
 
 @keyframes commandbar {
 	0% {
-		top: -100px;
-    left: 0px;
+		transform: translate3d(0, -100px, 0);
 	}
 	1% {
-		top: 0px;
-    left: 0;
+		transform: translate3d(0, 0, 0);
 	}
   19% {
-    top: 0px;
-    left: 0;
+    transform: translate3d(0, 0, 0);
   }
   20% {
-    left: -1040px;
+    transform: translate3d(-1040px, 0, 0);
   }
   99% {
-    top: -100px;
-    left: -1040px;
+		transform: translate3d(-1040px, -100px, 0);
   }
   100% {
-    top: -100px;
-    left: 0px;
+		transform: translate3d(0, -100px, 0);
   }
 }
 
