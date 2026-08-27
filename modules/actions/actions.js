@@ -32,6 +32,7 @@ const ACTION_DEFINITIONS = {
   'border.alert': { execute: executeBorderAlert, quietable: true, requiredFields: [] },
   'chyron.alert': { execute: executeChyronAlert, quietable: true, requiredFields: [['h1'], ['h2'], ['h3']] },
   'overlay.alert': { execute: executeOverlayAlert, quietable: true, requiredFields: [['message']] },
+  'overlay.raffleAlert': { execute: executeOverlayRaffleAlert, quietable: true, requiredFields: [['title']] },
   'overlay.terminator': { execute: executeOverlayTerminator, quietable: true, requiredFields: [] },
   'overlay.emit': { execute: executeOverlayEmit, quietable: true, requiredFields: [['event']] },
   'sound.pickRandom': { execute: executeSoundPickRandom, quietable: true, requiredFields: [], sound: true },
@@ -279,6 +280,24 @@ function executeOverlayAlert(action, context, options, runtime) {
   runtime.io.emit('text-alert', { message })
   const soundResult = maybePlayAlertSound(action, context, options, runtime, 'overlay.alert')
   return soundResult ? { type: 'overlay.alert', message, sound: soundResult } : { type: 'overlay.alert', message }
+}
+
+function executeOverlayRaffleAlert(action, context, options, runtime) {
+  const payload = {
+    title: hydrate(action.title, context),
+    prefix: hydrate(action.prefix || '', context),
+    command: hydrate(action.command || '', context),
+    suffix: hydrate(action.suffix || '', context),
+    subtitle: hydrate(action.subtitle || '', context)
+  }
+  if (!payload.title) throw new Error('overlay.raffleAlert requires a title')
+  if (action.durationMs !== undefined) payload.durationMs = action.durationMs
+
+  runtime.overlayEmit('raffle-alert', payload)
+  const soundResult = maybePlayAlertSound(action, context, options, runtime, 'overlay.raffleAlert')
+  return soundResult
+    ? { type: 'overlay.raffleAlert', ...payload, sound: soundResult }
+    : { type: 'overlay.raffleAlert', ...payload }
 }
 
 /**

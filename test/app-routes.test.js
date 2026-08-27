@@ -526,6 +526,46 @@ test('/api/v1/terminator enqueues a terminator overlay action', async () => {
   }])
 })
 
+test('raffle alert test routes enqueue open and fake-winner previews', async () => {
+  const { enqueued, services } = createFakeServices()
+  const app = createApp(services)
+
+  await withTestServer(app, async baseUrl => {
+    const open = await postJson(baseUrl, '/api/v1/raffle/test-open')
+    const winner = await postJson(baseUrl, '/api/v1/raffle/test-winner')
+
+    assert.equal(open.response.status, 200)
+    assert.equal(winner.response.status, 200)
+  })
+
+  assert.deepEqual(enqueued.map(item => ({ name: item.name, actions: item.actions })), [
+    {
+      name: 'Test Raffle Open Alert',
+      actions: {
+        type: 'overlay.raffleAlert',
+        title: 'RAFFLE ACTIVE',
+        prefix: 'TYPE',
+        command: '!join',
+        suffix: 'IN CHAT TO ENTER',
+        subtitle: '250 RAFFLE POINTS • WINNER SELECTED LIVE',
+        sound: false
+      }
+    },
+    {
+      name: 'Test Raffle Winner Alert',
+      actions: {
+        type: 'overlay.raffleAlert',
+        title: 'RAFFLE CLOSED',
+        prefix: 'WINNER',
+        command: 'ViperverseViewer',
+        suffix: '',
+        subtitle: 'RAFFLE WINNER: VIPERVERSEVIEWER. +250 RAFFLE POINTS.',
+        sound: false
+      }
+    }
+  ])
+})
+
 test('/api/v1/bg-alert enqueues the semantic border alert action', async () => {
   const { enqueued, services } = createFakeServices()
   const app = createApp(services)

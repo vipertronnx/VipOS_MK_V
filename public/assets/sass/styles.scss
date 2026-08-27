@@ -334,6 +334,67 @@ a:hover {color: var(--featured-color-hover);}
   }
 }
 
+#raffle-wrapper {
+  --xvbs-cyan: #9ffcff;
+  --xvbs-cyan-bright: #dfffff;
+  --xvbs-white: #f4ffff;
+  height: 280px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 30px;
+  top: 30px;
+  transform: scaleX(.06);
+  transform-origin: center;
+  width: min(920px, 92vw);
+  z-index: 100;
+
+  &.active { animation: xvbs-enter 650ms cubic-bezier(.12,.85,.22,1) forwards, xvbs-idle 2.2s ease-in-out 650ms infinite; }
+  &.exit { animation: xvbs-exit 550ms cubic-bezier(.7,0,.9,.3) forwards; }
+
+  #raffle-panel {
+    background: linear-gradient(135deg, rgba(14,31,42,.98), rgba(3,9,17,.98));
+    border: 3px solid var(--xvbs-cyan);
+    border-radius: 18px;
+    box-shadow: 0 0 10px rgba(130,250,255,.8), 0 0 28px rgba(70,220,235,.35), inset 0 0 30px rgba(32,145,160,.12);
+    height: 100%; overflow: hidden; position: relative; width: 100%;
+
+    &::before { border: 1px solid rgba(120,240,245,.45); border-radius: 11px; content: ''; inset: 9px; pointer-events: none; position: absolute; }
+    &::after { background: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(0,0,0,.17) 4px); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 20; }
+  }
+
+  .xvbs-header {
+    align-items: center; background: rgba(7,25,35,.92); border-bottom: 1px solid rgba(120,240,245,.4); color: #afeff1;
+    display: flex; font-family: 'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif; font-size: 14px; font-weight: 800;
+    height: 45px; letter-spacing: 2px; overflow: hidden; padding: 0 22px; position: relative; white-space: nowrap; z-index: 5;
+  }
+
+  .header-scanner { animation: raffle-scanner-pass 2.8s linear infinite; background: linear-gradient(90deg, transparent, rgba(160,255,255,.25), transparent); height: 100%; left: -120px; position: absolute; top: 0; width: 90px; }
+  .raffle-body { display: grid; gap: 26px; grid-template-columns: 150px minmax(0, 1fr); height: calc(100% - 45px); overflow: hidden; padding: 20px 28px 22px 22px; position: relative; width: 100%; z-index: 5; }
+  .station-badge { align-items: center; background: linear-gradient(180deg, rgba(12,31,40,.95), rgba(5,15,23,.95)); border: 1px solid rgba(120,235,240,.7); display: flex; flex-direction: column; justify-content: center; min-width: 0; overflow: hidden; }
+  .station-orb { align-items: center; border: 3px solid var(--xvbs-cyan); border-radius: 50%; box-shadow: 0 0 15px rgba(140,250,255,.45), inset 0 0 15px rgba(140,250,255,.15); display: flex; height: 84px; justify-content: center; margin-bottom: 13px; position: relative; width: 84px; }
+  .station-v { color: var(--xvbs-white); font-size: 42px; font-weight: 900; line-height: 1; }
+  .scanner-dot { animation: raffle-orbit 2.6s linear infinite; background: #fff; border-radius: 50%; box-shadow: 0 0 4px #fff, 0 0 10px var(--xvbs-cyan); height: 8px; position: absolute; width: 8px; }
+  .station-id { color: var(--xvbs-cyan-bright); font-size: 18px; font-weight: 900; letter-spacing: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .raffle-content { display: flex; flex-direction: column; justify-content: center; min-width: 0; overflow: hidden; }
+  .raffle-title { color: var(--xvbs-white); font-size: clamp(38px, 5.2vw, 66px); font-weight: 900; letter-spacing: 1px; line-height: .95; margin: 0; max-width: 100%; overflow: hidden; text-overflow: clip; text-shadow: 0 0 8px rgba(160,255,255,.45); white-space: nowrap; }
+  .signal-divider { border-top: 1px solid rgba(110,220,230,.65); height: 30px; margin: 12px 0 7px; overflow: hidden; position: relative; width: 100%; }
+  .signal-bars { align-items: center; display: flex; gap: 5px; height: 18px; left: 0; position: absolute; top: 6px; }
+  .signal-bar { animation: raffle-signal 700ms ease-in-out infinite alternate; background: var(--xvbs-cyan); opacity: .75; width: 3px; }
+  .raffle-command { color: #fff; font-size: clamp(20px, 2.6vw, 30px); font-weight: 900; letter-spacing: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; strong { color: var(--xvbs-cyan); } }
+  .raffle-subtitle { color: #83bfc4; font-size: clamp(12px, 1.65vw, 17px); font-weight: 700; letter-spacing: 1.5px; margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+  .glitch-line { background: rgba(200,255,255,.85); height: 2px; left: 8%; opacity: 0; pointer-events: none; position: absolute; right: 8%; z-index: 15; &:nth-child(1) { animation-delay: 300ms !important; } &:nth-child(2) { animation-delay: 1.7s !important; } &:nth-child(3) { animation-delay: 3.1s !important; } }
+  &.active .glitch-line { animation: raffle-glitch 4.2s steps(1) infinite; }
+}
+
+@keyframes xvbs-enter { 0% { filter: brightness(2); opacity: 0; transform: scaleX(.04); } 35% { opacity: 1; } 70% { transform: scaleX(1.035); } 100% { filter: brightness(1); opacity: 1; transform: scaleX(1); } }
+@keyframes xvbs-idle { 0%, 100% { filter: drop-shadow(0 0 4px rgba(140,255,255,.25)); } 50% { filter: drop-shadow(0 0 12px rgba(140,255,255,.5)); } }
+@keyframes xvbs-exit { 0% { opacity: 1; transform: scaleX(1); } 45% { transform: scaleX(1.03); } 100% { opacity: 0; transform: scaleX(.03); } }
+@keyframes raffle-scanner-pass { from { left: -120px; } to { left: 110%; } }
+@keyframes raffle-orbit { from { transform: rotate(0deg) translateX(34px); } to { transform: rotate(360deg) translateX(34px); } }
+@keyframes raffle-signal { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
+@keyframes raffle-glitch { 0%, 90%, 94%, 100% { opacity: 0; transform: translateX(0); } 91% { opacity: .8; top: 33%; transform: translateX(-15px); } 92% { opacity: .55; top: 68%; transform: translateX(24px); } 93% { opacity: .75; top: 52%; transform: translateX(-8px); } }
+
 /* C H Y R O N - B A R
 -------------------------------------------------------------------------------*/
 #chyron-container {

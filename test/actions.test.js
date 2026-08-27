@@ -88,6 +88,7 @@ test('action structure validation accepts every supported action type', () => {
     { type: 'border.alert' },
     { type: 'chyron.alert', h1: 'Headline', h2: 'Subhead', h3: 'Title' },
     { type: 'overlay.alert', message: '{displayName} joined' },
+    { type: 'overlay.raffleAlert', title: 'RAFFLE ACTIVE' },
     { type: 'overlay.terminator', message: 'Terminator engaged' },
     { type: 'overlay.emit', event: 'bg-alert' },
     { type: 'sound.pickRandom' },
@@ -131,6 +132,7 @@ test('action structure validation rejects unknown types and missing required fie
     ['obs.source', {}, 'obs.source requires source or input'],
     ['chyron.alert', {}, 'chyron.alert requires h1'],
     ['overlay.alert', {}, 'overlay.alert requires message'],
+    ['overlay.raffleAlert', {}, 'overlay.raffleAlert requires title'],
     ['overlay.emit', {}, 'overlay.emit requires event'],
     ['sound.play', {}, 'sound.play requires src or path']
   ]
@@ -200,6 +202,7 @@ test('action definitions execute every supported action type', async () => {
       { type: 'obs.scene', scene: 'Live' },
       { type: 'obs.source', scene: 'Live', source: 'Camera', visible: true },
       { type: 'overlay.alert', message: '{greeting} alert', sound: false },
+      { type: 'overlay.raffleAlert', title: 'RAFFLE ACTIVE', command: '!join', sound: false },
       { type: 'border.alert', sound: false },
       { type: 'overlay.terminator', message: '{greeting} terminator', payload: { message: '{greeting} terminator' } },
       { type: 'overlay.emit', event: 'custom-alert', payload: { greeting: '{greeting}' } },
@@ -217,6 +220,7 @@ test('action definitions execute every supported action type', async () => {
       'obs.scene',
       'obs.source',
       'overlay.alert',
+      'overlay.raffleAlert',
       'border.alert',
       'overlay.terminator',
       'overlay.emit',
@@ -236,6 +240,7 @@ test('action definitions execute every supported action type', async () => {
     assert.deepEqual(emitted, [
       { event: 'bg-alert', payload: undefined },
       { event: 'text-alert', payload: { message: 'Hello alert' } },
+      { event: 'raffle-alert', payload: { title: 'RAFFLE ACTIVE', prefix: '', command: '!join', suffix: '', subtitle: '' } },
       { event: 'bg-alert', payload: undefined },
       { event: 'terminator', payload: { message: 'Hello terminator' } },
       { event: 'custom-alert', payload: { greeting: 'Hello' } },

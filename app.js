@@ -802,6 +802,30 @@ function createApp(services, { port = PORT, portContext = createPortContext(port
     res.json({ ok: true, raffle: raffle.close({ requirePersistence: true }), queue: actionQueue.getStatus() })
   })
 
+  app.post('/api/v1/raffle/test-open', (req, res) => {
+    enqueueApiActions(res, 'Test Raffle Open Alert', {
+      type: 'overlay.raffleAlert',
+      title: 'RAFFLE ACTIVE',
+      prefix: 'TYPE',
+      command: '!join',
+      suffix: 'IN CHAT TO ENTER',
+      subtitle: '250 RAFFLE POINTS • WINNER SELECTED LIVE',
+      sound: false
+    })
+  })
+
+  app.post('/api/v1/raffle/test-winner', (req, res) => {
+    enqueueApiActions(res, 'Test Raffle Winner Alert', {
+      type: 'overlay.raffleAlert',
+      title: 'RAFFLE CLOSED',
+      prefix: 'WINNER',
+      command: 'ViperverseViewer',
+      suffix: '',
+      subtitle: 'RAFFLE WINNER: VIPERVERSEVIEWER. +250 RAFFLE POINTS.',
+      sound: false
+    })
+  })
+
   app.get('/api/v1/sounds', (req, res) => {
     const refresh = parseBool(req.query.refresh, false)
     res.json({ ok: true, sounds: listSoundFiles({ cacheTtlMs: refresh ? 0 : undefined }) })

@@ -365,8 +365,12 @@ function createRaffleService({
         message: `/me New Raffle for ${chatPrize}. Winner picked in ${formatDuration(state.settings.entryWindowMs)}. Type "${state.settings.entryCommand}" to enter.`
       },
       {
-        type: 'overlay.alert',
-        message: `New Raffle started for ${overlayPrize}!`,
+        type: 'overlay.raffleAlert',
+        title: 'RAFFLE ACTIVE',
+        prefix: 'TYPE',
+        command: state.settings.entryCommand,
+        suffix: 'IN CHAT TO ENTER',
+        subtitle: `${overlayPrize.toUpperCase()} • WINNER SELECTED LIVE`,
         sound: state.settings.alertSound || false
       }
     ], { source: 'raffle', raffle: { event: 'open', id: state.current.id } })
@@ -382,7 +386,14 @@ function createRaffleService({
 
     await announce([
       { type: 'chat.say', message: chatMessage },
-      { type: 'overlay.alert', message: overlayMessage }
+      {
+        type: 'overlay.raffleAlert',
+        title: 'RAFFLE CLOSED',
+        prefix: historyItem.winner ? 'WINNER' : 'STATUS',
+        command: historyItem.winner ? historyItem.winner.displayName : 'NO ENTRIES',
+        suffix: '',
+        subtitle: overlayMessage.toUpperCase()
+      }
     ], { source: 'raffle', raffle: { event: 'closed', id: historyItem.id } })
   }
 
