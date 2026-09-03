@@ -344,8 +344,8 @@ a:hover {color: var(--featured-color-hover);}
   position: absolute;
   right: 30px;
   top: 30px;
-  transform: scaleX(.06);
-  transform-origin: center;
+  transform: scale(.85) scaleX(.06);
+  transform-origin: top right;
   width: min(920px, 92vw);
   z-index: 100;
 
@@ -383,13 +383,11 @@ a:hover {color: var(--featured-color-hover);}
   .signal-bar { animation: raffle-signal 700ms ease-in-out infinite alternate; background: var(--xvbs-cyan); opacity: .75; width: 3px; }
   .raffle-command { color: #fff; font-size: clamp(20px, 2.6vw, 30px); font-weight: 900; letter-spacing: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; strong { color: var(--xvbs-cyan); } }
   .raffle-subtitle { color: #83bfc4; font-size: clamp(12px, 1.65vw, 17px); font-weight: 700; letter-spacing: 1.5px; margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
-  .glitch-line { background: rgba(200,255,255,.85); height: 2px; left: 8%; opacity: 0; pointer-events: none; position: absolute; right: 8%; z-index: 15; &:nth-child(1) { animation-delay: 300ms !important; } &:nth-child(2) { animation-delay: 1.7s !important; } &:nth-child(3) { animation-delay: 3.1s !important; } }
-  &.active .glitch-line { animation: raffle-glitch 4.2s steps(1) infinite; }
 }
 
-@keyframes xvbs-enter { 0% { filter: brightness(2); opacity: 0; transform: scaleX(.04); } 35% { opacity: 1; } 70% { transform: scaleX(1.035); } 100% { filter: brightness(1); opacity: 1; transform: scaleX(1); } }
+@keyframes xvbs-enter { 0% { filter: brightness(2); opacity: 0; transform: scale(.85) scaleX(.04); } 35% { opacity: 1; } 70% { transform: scale(.85) scaleX(1.035); } 100% { filter: brightness(1); opacity: 1; transform: scale(.85) scaleX(1); } }
 @keyframes xvbs-idle { 0%, 100% { filter: drop-shadow(0 0 4px rgba(140,255,255,.25)); } 50% { filter: drop-shadow(0 0 12px rgba(140,255,255,.5)); } }
-@keyframes xvbs-exit { 0% { opacity: 1; transform: scaleX(1); } 45% { transform: scaleX(1.03); } 100% { opacity: 0; transform: scaleX(.03); } }
+@keyframes xvbs-exit { 0% { opacity: 1; transform: scale(.85) scaleX(1); } 45% { transform: scale(.85) scaleX(1.03); } 100% { opacity: 0; transform: scale(.85) scaleX(.03); } }
 @keyframes raffle-scanner-pass { from { left: -120px; } to { left: 110%; } }
 @keyframes raffle-orbit { from { transform: rotate(0deg) translateX(34px); } to { transform: rotate(360deg) translateX(34px); } }
 @keyframes raffle-signal { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
